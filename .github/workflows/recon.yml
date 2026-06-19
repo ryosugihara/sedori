@@ -1,0 +1,40 @@
+# KINDAL 接続テスト用のワークフロー
+# 「Actions」タブから手動で実行（Run workflow）したときだけ動きます。
+name: KINDAL接続テスト
+
+on:
+  workflow_dispatch: # ← 手動実行ボタンを表示するための設定
+
+# このワークフローがリポジトリに結果を書き込めるようにする
+permissions:
+  contents: write
+
+jobs:
+  recon:
+    runs-on: ubuntu-latest # GitHubが用意するクラウドPC上で動く
+    steps:
+      # 1. このリポジトリの中身を取ってくる
+      - name: リポジトリを取得
+        uses: actions/checkout@v4
+
+      # 2. Python を使えるようにする
+      - name: Pythonを準備
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # 3. 接続テストのプログラムを実行する
+      #    Discordのカギ(Webhook URL)は GitHub の Secrets から安全に渡す
+      - name: 接続テストを実行
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: python scripts/recon.py
+
+      # 4. 取得した結果(recon フォルダ)をリポジトリに保存する
+      - name: 結果を保存
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add recon
+          git commit -m "接続テスト結果を保存" || echo "変更なし"
+          git push
