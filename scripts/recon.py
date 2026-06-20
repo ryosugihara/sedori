@@ -23,8 +23,8 @@ import urllib.error
 # --- 設定 ------------------------------------------------------------
 # 確認したい KINDAL のページURL（まずはトップページ）
 TARGET_URLS = [
-    # トレファク: サンローランを「新着順」で検索した結果ページ（商品が抜き出せるか確認）
-    "https://www.trefac.jp/store/tcpsb/?srchword=SAINT%20LAURENT&step=1&order=new",
+    # メルカリ: サンローランの「売り切れ(売れた)」検索。データが取れるか/ブロックされるか調査
+    "https://jp.mercari.com/search?keyword=Saint%20Laurent&status=sold_out",
 ]
 
 # 本物のブラウザのふりをするための情報（これがないと弾かれやすい）
