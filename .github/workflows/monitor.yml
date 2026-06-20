@@ -1,13 +1,12 @@
-# KINDAL 新着監視を「定期的に自動実行」するワークフロー
+# KINDAL 新着監視（30秒ごとに見張り続けるループ方式）
 name: KINDAL新着監視
 
 on:
   schedule:
-    # 30分ごとに自動実行（数字を変えれば間隔を変えられます。例: "*/15 * * * *" で15分ごと）
+    # 30分ごとに「新しい見張り」を開始する（前の見張りは約27分で終わる）
     - cron: "*/30 * * * *"
-  workflow_dispatch: # 手動でも動かせるように
+  workflow_dispatch: # 手動でも開始できる
 
-# 結果（見た商品リスト）をリポジトリに保存するための書き込み権限
 permissions:
   contents: write
 
@@ -19,6 +18,7 @@ concurrency:
 jobs:
   monitor:
     runs-on: ubuntu-latest
+    timeout-minutes: 30 # 安全のための最大時間
     steps:
       - name: リポジトリを取得
         uses: actions/checkout@v4
@@ -28,18 +28,21 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: 新着監視を実行
+      - name: 新着監視（ループ）を実行
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          LOOP_MODE: "1" # ループ監視を有効にする
+          POLL_SECONDS: "30" # 何秒ごとにチェックするか（小さいほど速い／サイトに優しくするなら大きく）
+          LOOP_MINUTES: "27" # 1回の見張り時間（次の開始まで余裕を持たせる）
         run: python scripts/monitor.py
 
       - name: 見た商品リストを保存
+        if: always() # 途中で終わっても最後に保存を試みる
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@users.noreply.github.com"
           git add state
-          # 変化があった時だけ記録する（無ければ何もしない）
+          # 変化があった時だけ記録する
           git commit -m "新着監視: 状態を更新 [skip ci]" || { echo "変更なし"; exit 0; }
-          # 念のため最新を取り込んでから保存する
           git pull --rebase origin ${{ github.ref_name }} || true
           git push || echo "push をスキップしました"

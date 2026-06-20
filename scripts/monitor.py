@@ -27,6 +27,10 @@ PER_PAGE = 250                        # 1回の取得件数（Shopifyの最大�
 MAX_PAGES = 20                        # 安全のための上限（無限ループ防止）
 REQUEST_WAIT = 1.5                    # サイトへの優しさ（アクセスの間に待つ秒数）
 
+# ↓ ループ監視（短い間隔で見張り続ける）用の設定。数字は環境変数で変えられます。
+POLL_SECONDS = int(os.environ.get("POLL_SECONDS", "30"))  # 何秒ごとにチェックするか
+LOOP_MINUTES = int(os.environ.get("LOOP_MINUTES", "27"))  # 1回の見張りを何分続けるか
+
 # 本物のブラウザのふりをするための情報
 HEADERS = {
     "User-Agent": (
@@ -146,57 +150,83 @@ def send_items(items):
         time.sleep(1)  # 連続で送りすぎない
 
 
-def main():
-    # 見張るブランド一覧を読み込む
-    brands = load_json_file(BRANDS_FILE, {"brands": []}).get("brands", [])
-    # 「見た商品」の記録を読み込む（形は { "売り場名": [見た商品IDたち] }）
-    seen = load_json_file(STATE_FILE, {})
-    # 記録が空っぽなら「初回」と判断する
-    first_run = (len(seen) == 0)
-
-    new_items = []  # 今回見つかった新着（あとでまとめて通知する）
-
+def check_all(brands, seen, first_run):
+    """全ブランドを1回チェックして、新着リストを返す。seen(見た記録)も更新する。"""
+    new_items = []
     for b in brands:
         name = b["name"]
         handle = b["collection"]
-        print(f"チェック中: {name} ({handle})")
-
         products = fetch_collection_products(handle)
         # 今ある商品のID一覧（None は除く）
         current_ids = [p["id"] for p in products if p.get("id") is not None]
         seen_ids = set(seen.get(handle, []))
-
         # 「前に見ていない＝新着」の商品を抜き出す
         fresh = [p for p in products if p.get("id") not in seen_ids]
 
         if first_run:
-            print(f"  初回のため {len(current_ids)} 件を記録（通知なし）")
-        else:
+            print(f"  初回: {name} を {len(current_ids)} 件記録（通知なし）")
+        elif fresh:
             for p in fresh:
                 new_items.append(build_item(p, name))
-            print(f"  新着 {len(fresh)} 件" if fresh else "  新着なし")
+            print(f"  新着 {len(fresh)} 件: {name}")
 
         # 見た商品リストを更新（今ある商品IDを全部覚える）
         seen[handle] = sorted(seen_ids | set(current_ids))
         time.sleep(REQUEST_WAIT)
+    return new_items
 
-    # 結果に応じて通知する
+
+def main():
+    # 見張るブランド一覧と、これまでに「見た商品」の記録を読み込む
+    brands = load_json_file(BRANDS_FILE, {"brands": []}).get("brands", [])
+    seen = load_json_file(STATE_FILE, {})
+    first_run = (len(seen) == 0)  # 記録が空っぽなら初回
+
+    # 環境変数 LOOP_MODE=1 のときは「ループ監視」、それ以外は「1回だけ」
+    loop_mode = (os.environ.get("LOOP_MODE") == "1")
+
+    # --- 1回だけチェックするモード（手動の動作確認用）---
+    if not loop_mode:
+        new_items = check_all(brands, seen, first_run)
+        if first_run:
+            send_text("✅ 監視を開始しました（在庫を記録。通知は次回から）")
+        elif new_items:
+            send_items(new_items)
+        else:
+            print("新着なし")
+        save_json_file(STATE_FILE, seen)
+        print("完了")
+        return
+
+    # --- ループ監視モード（短い間隔で見張り続ける）---
+    print(f"ループ監視開始: {POLL_SECONDS}秒ごと / 最長 {LOOP_MINUTES}分")
+    end_time = time.time() + LOOP_MINUTES * 60
+
+    # まず最初の1回チェック
+    new_items = check_all(brands, seen, first_run)
     if first_run:
         names = "、".join(sorted({b["name"] for b in brands}))
         send_text(
             "✅ KINDAL 新着監視を開始しました！\n"
-            "今ある在庫を記録したので、次回からは新しく入荷した商品だけを通知します。\n"
-            f"対象ブランド: {names}"
+            f"対象ブランド: {names}\n"
+            f"これから約{POLL_SECONDS}秒ごとに新着をチェックします。"
         )
     elif new_items:
-        print(f"合計 {len(new_items)} 件の新着を通知します")
         send_items(new_items)
-    else:
-        print("新着はありませんでした（通知なし）")
-
-    # 「見た商品」の記録を保存する
     save_json_file(STATE_FILE, seen)
-    print("完了")
+
+    # 決めた時間内は、くり返しチェックし続ける
+    while time.time() < end_time:
+        time.sleep(POLL_SECONDS)
+        items = check_all(brands, seen, False)
+        if items:
+            print(f"新着 {len(items)} 件 → 通知")
+            send_items(items)
+            save_json_file(STATE_FILE, seen)  # 念のためその都度保存
+
+    # 最後に記録を保存して終了（次の見張りが続きから始められる）
+    save_json_file(STATE_FILE, seen)
+    print("ループ監視 終了")
 
 
 if __name__ == "__main__":
