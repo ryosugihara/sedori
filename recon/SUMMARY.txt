@@ -1,3 +1,4 @@
-KINDAL 接続テスト  実行時刻: 2026-06-20 06:45:04
+KINDAL 接続テスト  実行時刻: 2026-06-20 06:46:43
 
-[1] https://kind.co.jp/  ->  status=None, size=151 bytes
+[1] https://www.kind.co.jp/  ->  status=200, final=https://www.kind.co.jp/, size=97956 bytes
+[2] https://kind.co.jp/  ->  status=None, final=https://kind.co.jp/, size=151 bytes
