@@ -18,7 +18,7 @@ concurrency:
 jobs:
   monitor:
     runs-on: ubuntu-latest
-    timeout-minutes: 30 # 安全のための最大時間
+    timeout-minutes: 360 # 安全のための最大時間（6時間）
     steps:
       - name: リポジトリを取得
         uses: actions/checkout@v4
@@ -33,7 +33,7 @@ jobs:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           LOOP_MODE: "1" # ループ監視を有効にする
           POLL_SECONDS: "30" # 何秒ごとにチェックするか（小さいほど速い／サイトに優しくするなら大きく）
-          LOOP_MINUTES: "27" # 1回の見張り時間（次の開始まで余裕を持たせる）
+          LOOP_MINUTES: "300" # 1回の見張り時間（5時間。止まる隙間を減らす）
         run: python scripts/monitor.py
 
       - name: 見た商品リストを保存
@@ -46,3 +46,20 @@ jobs:
           git commit -m "新着監視: 状態を更新 [skip ci]" || { echo "変更なし"; exit 0; }
           git pull --rebase origin ${{ github.ref_name }} || true
           git push || echo "push をスキップしました"
+
+      - name: 次の監視を自動で開始（PATがある時だけ）
+        if: success() # 正常に終わった時だけ（クラッシュ時の連続再起動を防ぐ）
+        env:
+          PAT: ${{ secrets.PAT_TOKEN }}
+        run: |
+          if [ -n "$PAT" ]; then
+            echo "次の監視を自動起動します"
+            curl -sS -X POST \
+              -H "Authorization: Bearer $PAT" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/${{ github.repository }}/actions/workflows/monitor.yml/dispatches" \
+              -d '{"ref":"${{ github.ref_name }}"}'
+          else
+            echo "PAT_TOKEN 未設定のため自動再起動はスキップ（cron/手動に依存）"
+          fi
+
