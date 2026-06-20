@@ -1,0 +1,6 @@
+{
+  "_メモ": "トレファク(TREFAC FASHION)で見張るブランド。name=通知に出る名前 / keyword=サイトで検索する言葉。あとから増減できます。",
+  "brands": [
+    { "name": "Saint Laurent", "keyword": "SAINT LAURENT" }
+  ]
+}
