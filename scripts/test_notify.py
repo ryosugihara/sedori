@@ -31,7 +31,13 @@ payload = {
 
 data = json.dumps(payload).encode("utf-8")
 req = urllib.request.Request(
-    webhook, data=data, headers={"Content-Type": "application/json"}
+    webhook,
+    data=data,
+    headers={
+        "Content-Type": "application/json",
+        # ↓ これが無いと Discord に 403 で拒否される（名乗りが必要）
+        "User-Agent": "sedori-bot/1.0 (+https://github.com/ryosugihara/sedori)",
+    },
 )
 urllib.request.urlopen(req, timeout=30)
 print("テスト通知を送信しました")
