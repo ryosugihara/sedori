@@ -23,11 +23,8 @@ import urllib.error
 # --- 設定 ------------------------------------------------------------
 # 確認したい KINDAL のページURL（まずはトップページ）
 TARGET_URLS = [
-    # トレファク ファッションオンライン の候補アドレス（どれが正解か確認する）
-    "https://fashion.treasure-f.com/",
-    "https://www.trefac.jp/",
-    "https://www.treasure-f.com/",
-    "https://trefac.jp/",
+    # トレファク: サンローランを「新着順」で検索した結果ページ（商品が抜き出せるか確認）
+    "https://www.trefac.jp/store/tcpsb/?srchword=SAINT%20LAURENT&step=1&order=new",
 ]
 
 # 本物のブラウザのふりをするための情報（これがないと弾かれやすい）
