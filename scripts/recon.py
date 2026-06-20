@@ -23,8 +23,11 @@ import urllib.error
 # --- 設定 ------------------------------------------------------------
 # 確認したい KINDAL のページURL（まずはトップページ）
 TARGET_URLS = [
-    # ブランド一覧ページ（各ブランドの正確な名前/リンクを確認する）
-    "https://shop.kind.co.jp/pages/brand",
+    # トレファク ファッションオンライン の候補アドレス（どれが正解か確認する）
+    "https://fashion.treasure-f.com/",
+    "https://www.trefac.jp/",
+    "https://www.treasure-f.com/",
+    "https://trefac.jp/",
 ]
 
 # 本物のブラウザのふりをするための情報（これがないと弾かれやすい）
