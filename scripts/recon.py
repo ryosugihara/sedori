@@ -23,7 +23,8 @@ import urllib.error
 # --- 設定 ------------------------------------------------------------
 # 確認したい KINDAL のページURL（まずはトップページ）
 TARGET_URLS = [
-    "https://shop.kind.co.jp/",  # KINDAL の通販(オンラインストア)トップ
+    # Shopify の「商品データ(JSON)」入口。新着コレクションの中身を5件だけ取得して構造を確認する
+    "https://shop.kind.co.jp/collections/new-item/products.json?limit=5",
 ]
 
 # 本物のブラウザのふりをするための情報（これがないと弾かれやすい）
