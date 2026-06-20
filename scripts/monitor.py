@@ -15,9 +15,11 @@
 """
 
 import os
+import re
 import json
 import time
 import urllib.request
+import urllib.parse
 
 import trefac  # トレファク用の読み取り部品（同じフォルダの trefac.py）
 
@@ -28,6 +30,8 @@ STATE_FILE = "state/seen.json"        # KINDAL の「見た商品」記録
 
 TREFAC_BRANDS_FILE = "watch_trefac.json"     # トレファク の見張るブランド一覧
 TREFAC_STATE_FILE = "state/trefac_seen.json" # トレファク の「見た商品」記録
+
+SOUBA_FILE = "souba.json"                    # メルカリで売れた値段の記録（利益判定に使う）
 PER_PAGE = 250                        # 1回の取得件数（Shopifyの最大値）
 MAX_PAGES = 20                        # 安全のための上限（無限ループ防止）
 REQUEST_WAIT = 1.5                    # サイトへの優しさ（アクセスの間に待つ秒数）
@@ -88,11 +92,17 @@ def build_item(product, brand_name):
     """KINDAL の商品データから、通知に使う情報だけを取り出す"""
     variants = product.get("variants") or [{}]
     images = product.get("images") or []
+    raw_price = variants[0].get("price", "")
+    try:
+        price_num = int(float(raw_price))  # 計算用の数値
+    except Exception:
+        price_num = None
     return {
         "id": product.get("id"),
         "brand": brand_name,
         "title": product.get("title", "(名前なし)"),
-        "price": yen(variants[0].get("price", "")),
+        "price": yen(raw_price),
+        "price_num": price_num,
         "url": f"{SHOP}/products/{product.get('handle')}",
         "image": images[0].get("src") if images else None,
         "shop": "KINDAL",
@@ -149,8 +159,93 @@ def send_text(message):
     discord_post({"content": message[:1900]})
 
 
+# ===== ここから「メルカリ相場・利益見込み」関連 =====================
+
+def load_souba():
+    """相場メモ(souba.json)を読み込んで、設定と記録をまとめて返す"""
+    data = load_json_file(SOUBA_FILE, {})
+    s = data.get("設定", {})
+    return {
+        "fee": s.get("メルカリ手数料率", 0.10),       # メルカリ手数料(10%)
+        "shipping": s.get("想定送料", 800),            # 送料の想定
+        "high": s.get("利益見込み_高ライン_円", 20000),
+        "mid": s.get("利益見込み_中ライン_円", 3000),
+        "records": data.get("records", []),
+    }
+
+
+def extract_item_name(title):
+    """商品名から、検索に使いやすい部分を取り出す（「」の中があればそれを使う）"""
+    m = re.search(r"「([^」]+)」", title)
+    return m.group(1) if m else title
+
+
+def mercari_search_url(item):
+    """その商品の『メルカリ売り切れ相場』を開くリンクを作る"""
+    keyword = f"{item.get('brand', '')} {extract_item_name(item.get('title', ''))}".strip()
+    return (
+        "https://jp.mercari.com/search?keyword="
+        + urllib.parse.quote(keyword)
+        + "&status=sold_out&order=desc&sort=created_time"
+    )
+
+
+def match_souba(item, records):
+    """新着商品が、相場メモのどれかに一致するか探す（keywordsが全部、商品名に入っていれば一致）"""
+    title = item.get("title", "")
+    brand = (item.get("brand", "") + " " + title).lower()
+    best, best_n = None, -1
+    for r in records:
+        # ブランド指定があれば、それも一致条件にする
+        if r.get("brand") and r["brand"].lower() not in brand:
+            continue
+        kws = r.get("keywords", [])
+        if kws and all(k in title for k in kws):
+            if len(kws) > best_n:  # より具体的な(言葉数が多い)記録を優先
+                best, best_n = r, len(kws)
+    return best
+
+
+def profit_lines(item, souba):
+    """通知カードに足す『利益判定』の文章を作って返す"""
+    buy = item.get("price_num")
+    fee, ship = souba["fee"], souba["shipping"]
+    lines = []
+
+    # 1) 損益分岐ライン（相場メモが無くても必ず出せる）
+    if buy:
+        breakeven = int((buy + ship) / (1 - fee))
+        lines.append(
+            f"📈 メルカリで ¥{breakeven:,} 以上で利益"
+            f"（手数料{int(fee * 100)}%+送料¥{ship}想定）"
+        )
+
+    # 2) 相場メモに一致したら、利益見込み(高/中/低)を出す
+    rec = match_souba(item, souba["records"])
+    if rec and buy:
+        sell = rec["mercari_price"]
+        net = int(sell * (1 - fee) - ship)   # メルカリ手取り
+        profit = net - buy                   # 利益
+        if profit >= souba["high"]:
+            mark = "🟢 高"
+        elif profit >= souba["mid"]:
+            mark = "🟡 中"
+        else:
+            mark = "🔴 低"
+        lines.append(
+            f"💹 相場¥{sell:,} → 手取り¥{net:,} / 利益 約¥{profit:,}（利益見込み: {mark}）"
+        )
+
+    # 3) ワンタップの相場リンク（常に付ける）
+    lines.append(f"🔍 [メルカリ相場を見る]({mercari_search_url(item)})")
+    return "\n".join(lines)
+
+# ===== ここまで =====================================================
+
+
 def send_items(items):
     """新着商品を Discord に通知する（見やすいカード形式・最大10件ずつ）"""
+    souba = load_souba()  # 相場メモを読み込む（利益判定に使う）
     # Discord は1メッセージに最大10個のカード(embed)まで入れられる
     for i in range(0, len(items), 10):
         chunk = items[i:i + 10]
@@ -162,7 +257,10 @@ def send_items(items):
             embed = {
                 "title": it["title"][:250],
                 "url": it["url"],
-                "description": f"{shop_line}🏷️ {it['brand']}\n💴 {it['price']}",
+                "description": (
+                    f"{shop_line}🏷️ {it['brand']}\n💴 仕入 {it['price']}\n"
+                    + profit_lines(it, souba)
+                ),
             }
             if it.get("image"):
                 embed["thumbnail"] = {"url": it["image"]}

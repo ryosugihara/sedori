@@ -67,7 +67,12 @@ def parse_items(html):
 
         # 値段（￥12,345 の形。最初に出てくるものを使う）
         m_price = re.search(r'￥\s*([\d,]+)', block)
-        price = ("¥" + m_price.group(1)) if m_price else "(価格不明)"
+        if m_price:
+            price = "¥" + m_price.group(1)
+            price_num = int(m_price.group(1).replace(",", ""))  # 計算用の数値
+        else:
+            price = "(価格不明)"
+            price_num = None
 
         items.append(
             {
@@ -75,6 +80,7 @@ def parse_items(html):
                 "title": title,
                 "brand": brand,
                 "price": price,
+                "price_num": price_num,
                 "url": url,
                 "image": image,
                 "shop": SHOP_NAME,
