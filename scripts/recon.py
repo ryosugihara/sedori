@@ -23,8 +23,7 @@ import urllib.error
 # --- 設定 ------------------------------------------------------------
 # 確認したい KINDAL のページURL（まずはトップページ）
 TARGET_URLS = [
-    "https://www.kind.co.jp/",  # www あり（こちらが正しい可能性が高い）
-    "https://kind.co.jp/",      # www なし（比較用）
+    "https://shop.kind.co.jp/",  # KINDAL の通販(オンラインストア)トップ
 ]
 
 # 本物のブラウザのふりをするための情報（これがないと弾かれやすい）
