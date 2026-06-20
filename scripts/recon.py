@@ -23,7 +23,8 @@ import urllib.error
 # --- 設定 ------------------------------------------------------------
 # 確認したい KINDAL のページURL（まずはトップページ）
 TARGET_URLS = [
-    "https://kind.co.jp/",
+    "https://www.kind.co.jp/",  # www あり（こちらが正しい可能性が高い）
+    "https://kind.co.jp/",      # www なし（比較用）
 ]
 
 # 本物のブラウザのふりをするための情報（これがないと弾かれやすい）
@@ -43,17 +44,18 @@ OUTPUT_DIR = "recon"
 
 
 def fetch(url):
-    """1つのURLにアクセスして、(状態コード, 中身) を返す"""
+    """1つのURLにアクセスして、(状態コード, 最終URL, 中身) を返す"""
     req = urllib.request.Request(url, headers=HEADERS)
     try:
         with urllib.request.urlopen(req, timeout=30) as res:
-            return res.status, res.read()
+            # res.geturl() は、転送(リダイレクト)された後の最終的なアドレス
+            return res.status, res.geturl(), res.read()
     except urllib.error.HTTPError as e:
         # 403 などのエラー応答もここで中身を拾う
-        return e.code, e.read()
+        return e.code, url, e.read()
     except Exception as e:
         # ネットワーク自体がダメだった場合
-        return None, str(e).encode("utf-8")
+        return None, url, str(e).encode("utf-8")
 
 
 def send_discord(message):
@@ -82,9 +84,9 @@ def main():
     summary_lines = [f"KINDAL 接続テスト  実行時刻: {now}", ""]
 
     for i, url in enumerate(TARGET_URLS, start=1):
-        status, body = fetch(url)
+        status, final_url, body = fetch(url)
         size = len(body) if body else 0
-        line = f"[{i}] {url}  ->  status={status}, size={size} bytes"
+        line = f"[{i}] {url}  ->  status={status}, final={final_url}, size={size} bytes"
         print(line)
         summary_lines.append(line)
 
