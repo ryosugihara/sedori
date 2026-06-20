@@ -1,3 +1,6 @@
-KINDAL 接続テスト  実行時刻: 2026-06-20 06:49:23
+KINDAL 接続テスト  実行時刻: 2026-06-20 07:55:51
 
-[1] https://shop.kind.co.jp/pages/brand  ->  status=200, final=https://shop.kind.co.jp/pages/brand, size=484020 bytes
+[1] https://fashion.treasure-f.com/  ->  status=None, final=https://fashion.treasure-f.com/, size=52 bytes
+[2] https://www.trefac.jp/  ->  status=200, final=https://www.trefac.jp/, size=177764 bytes
+[3] https://www.treasure-f.com/  ->  status=200, final=https://www.treasure-f.com/, size=57445 bytes
+[4] https://trefac.jp/  ->  status=200, final=https://www.trefac.jp/, size=177764 bytes
