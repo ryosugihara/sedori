@@ -1,6 +1,3 @@
-KINDAL 接続テスト  実行時刻: 2026-06-20 07:55:51
+KINDAL 接続テスト  実行時刻: 2026-06-20 07:57:01
 
-[1] https://fashion.treasure-f.com/  ->  status=None, final=https://fashion.treasure-f.com/, size=52 bytes
-[2] https://www.trefac.jp/  ->  status=200, final=https://www.trefac.jp/, size=177764 bytes
-[3] https://www.treasure-f.com/  ->  status=200, final=https://www.treasure-f.com/, size=57445 bytes
-[4] https://trefac.jp/  ->  status=200, final=https://www.trefac.jp/, size=177764 bytes
+[1] https://www.trefac.jp/store/tcpsb/?srchword=SAINT%20LAURENT&step=1&order=new  ->  status=200, final=https://www.trefac.jp/store/tcpsb/?srchword=SAINT%20LAURENT&step=1&order=new, size=529347 bytes
