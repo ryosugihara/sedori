@@ -3,7 +3,13 @@
 name: KINDAL接続テスト
 
 on:
-  workflow_dispatch: # ← 手動実行ボタンを表示するための設定
+  workflow_dispatch: # ← 手動実行ボタン（GitHub画面から実行する用）
+  push:
+    branches:
+      - claude/adoring-bell-7rqznj # ← このブランチに更新があったら自動で実行
+    paths:
+      - "scripts/recon.py" # recon.py か
+      - ".github/workflows/recon.yml" # このワークフローが変わった時だけ動かす
 
 # このワークフローがリポジトリに結果を書き込めるようにする
 permissions:
