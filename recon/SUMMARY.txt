@@ -1,3 +1,3 @@
-KINDAL 接続テスト  実行時刻: 2026-06-20 06:47:27
+KINDAL 接続テスト  実行時刻: 2026-06-20 06:48:18
 
-[1] https://shop.kind.co.jp/  ->  status=200, final=https://shop.kind.co.jp/, size=679332 bytes
+[1] https://shop.kind.co.jp/collections/new-item/products.json?limit=5  ->  status=200, final=https://shop.kind.co.jp/collections/new-item/products.json?limit=5, size=16204 bytes
