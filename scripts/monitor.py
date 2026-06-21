@@ -18,6 +18,7 @@ import os
 import re
 import json
 import time
+import subprocess
 import urllib.request
 import urllib.parse
 
@@ -130,6 +131,35 @@ def save_json_file(path, data):
         os.makedirs(folder, exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+def git_save_state():
+    """state(見た記録)をすぐサーバーに保存(commit&push)する。
+    こうすると、別の実行が『古い記録』を見て同じ商品を二度通知するのを防げる。
+    GitHub上で動いている時だけ実行する（ローカルやデモでは何もしない）。
+    """
+    if os.environ.get("GITHUB_ACTIONS") != "true":
+        return
+    branch = os.environ.get("GITHUB_REF_NAME", "")
+    try:
+        subprocess.run(["git", "config", "user.name", "github-actions"], check=False)
+        subprocess.run(
+            ["git", "config", "user.email", "github-actions@users.noreply.github.com"],
+            check=False,
+        )
+        subprocess.run(["git", "add", "state"], check=False)
+        r = subprocess.run(
+            ["git", "commit", "-m", "新着監視: 状態を更新 [skip ci]"],
+            capture_output=True,
+        )
+        if r.returncode != 0:
+            return  # 変更が無ければ何もしない
+        if branch:
+            subprocess.run(["git", "pull", "--rebase", "origin", branch], check=False)
+        subprocess.run(["git", "push"], capture_output=True)
+        print("  状態をサーバーに保存しました")
+    except Exception as e:
+        print(f"  状態の保存(push)に失敗: {e}")
 
 
 def discord_post(payload):
@@ -360,6 +390,7 @@ def main():
     if new_items:
         send_items(new_items)
     save_all()
+    git_save_state()  # 記録をすぐサーバーに保存（重複通知を防ぐ）
 
     # 決めた時間内は、くり返しチェックし続ける（2回目以降は初回扱いしない）
     while time.time() < end_time:
@@ -368,10 +399,12 @@ def main():
         if items:
             print(f"新着 {len(items)} 件 → 通知")
             send_items(items)
-            save_all()  # 念のためその都度保存
+            save_all()
+            git_save_state()  # 通知したら即サーバー保存（重複通知を防ぐ）
 
     # 最後に記録を保存して終了（次の見張りが続きから始められる）
     save_all()
+    git_save_state()
     print("ループ監視 終了")
 
 
