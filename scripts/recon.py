@@ -23,7 +23,7 @@ import urllib.error
 # --- 設定 ------------------------------------------------------------
 # 確認したい KINDAL のページURL（まずはトップページ）
 TARGET_URLS = [
-    "https://www.okoku.jp/ec/js/facetedNavigation.js?20220324",
+    "https://www.okoku.jp/ec/Facet?inputKeywordFacet=SAINT%20LAURENT",
 ]
 
 # 本物のブラウザのふりをするための情報（これがないと弾かれやすい）
@@ -35,6 +35,7 @@ HEADERS = {
     ),
     "Accept-Language": "ja,en;q=0.9",
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "X-Requested-With": "XMLHttpRequest",
 }
 
 # 結果を保存するフォルダ名
