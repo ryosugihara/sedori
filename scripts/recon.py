@@ -23,8 +23,7 @@ import urllib.error
 # --- 設定 ------------------------------------------------------------
 # 確認したい KINDAL のページURL（まずはトップページ）
 TARGET_URLS = [
-    "https://netmall.hardoff.co.jp/search/?q=SAINT%20LAURENT",
-    "https://netmall.hardoff.co.jp/search/?keyword=SAINT%20LAURENT&category=clothing",
+    "https://www.okoku.jp/ec/js/facetedNavigation.js?20220324",
 ]
 
 # 本物のブラウザのふりをするための情報（これがないと弾かれやすい）
