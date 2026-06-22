@@ -23,11 +23,8 @@ import urllib.error
 # --- 設定 ------------------------------------------------------------
 # 確認したい KINDAL のページURL（まずはトップページ）
 TARGET_URLS = [
-    "https://api.rinkan-online.com/api/brands/public",
-    "https://api.rinkan-online.com/brands/public",
-    "https://api.rinkan-online.com/api/products?per_page=2",
-    "https://api.rinkan-online.com/api/v2/products?per_page=2",
-    "https://api.rinkan-online.com/api/search?keyword=saint%20laurent&per_page=2",
+    "https://www.okoku.jp/ec/index1.html",
+    "https://netmall.hardoff.co.jp/",
 ]
 
 # 本物のブラウザのふりをするための情報（これがないと弾かれやすい）
