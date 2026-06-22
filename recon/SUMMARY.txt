@@ -1,4 +1,5 @@
-KINDAL 接続テスト  実行時刻: 2026-06-22 09:56:22
+KINDAL 接続テスト  実行時刻: 2026-06-22 09:57:56
 
-[1] https://www.okoku.jp/ec/index1.html  ->  status=200, final=https://www.okoku.jp/ec/index1.html, size=146757 bytes
-[2] https://netmall.hardoff.co.jp/  ->  status=200, final=https://netmall.hardoff.co.jp/, size=137760 bytes
+[1] https://netmall.hardoff.co.jp/search/?keyword=SAINT%20LAURENT  ->  status=200, final=https://netmall.hardoff.co.jp/search/?keyword=SAINT%20LAURENT, size=116562 bytes
+[2] https://netmall.hardoff.co.jp/search/?keywords=SAINT%20LAURENT  ->  status=200, final=https://netmall.hardoff.co.jp/search/?keywords=SAINT%20LAURENT, size=116562 bytes
+[3] https://www.okoku.jp/ec/Facet?inputKeywordFacet=SAINT%20LAURENT  ->  status=200, final=https://www.okoku.jp/ec/Facet?inputKeywordFacet=SAINT%20LAURENT, size=213086 bytes
