@@ -1,0 +1,7 @@
+{
+  "_メモ": "RINKAN(リンカンオンライン)で見張るブランド。name=通知名 / keyword=検索する言葉。only_keywords があるとその言葉を含む物だけ通知。",
+  "brands": [
+    { "name": "Saint Laurent", "keyword": "saint laurent" },
+    { "name": "Undercover", "keyword": "undercover", "only_keywords": ["デニム", "denim", "ジーンズ", "jeans"] }
+  ]
+}
