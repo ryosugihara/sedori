@@ -1,7 +1,4 @@
-KINDAL 接続テスト  実行時刻: 2026-06-22 07:57:30
+KINDAL 接続テスト  実行時刻: 2026-06-22 09:56:22
 
-[1] https://api.rinkan-online.com/api/brands/public  ->  status=200, final=https://api.rinkan-online.com/api/brands/public, size=9838 bytes
-[2] https://api.rinkan-online.com/brands/public  ->  status=404, final=https://api.rinkan-online.com/brands/public, size=21 bytes
-[3] https://api.rinkan-online.com/api/products?per_page=2  ->  status=404, final=https://api.rinkan-online.com/api/products?per_page=2, size=21 bytes
-[4] https://api.rinkan-online.com/api/v2/products?per_page=2  ->  status=404, final=https://api.rinkan-online.com/api/v2/products?per_page=2, size=21 bytes
-[5] https://api.rinkan-online.com/api/search?keyword=saint%20laurent&per_page=2  ->  status=200, final=https://api.rinkan-online.com/api/search?keyword=saint%20laurent&per_page=2, size=25094 bytes
+[1] https://www.okoku.jp/ec/index1.html  ->  status=200, final=https://www.okoku.jp/ec/index1.html, size=146757 bytes
+[2] https://netmall.hardoff.co.jp/  ->  status=200, final=https://netmall.hardoff.co.jp/, size=137760 bytes
