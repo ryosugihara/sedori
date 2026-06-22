@@ -23,8 +23,8 @@ import urllib.error
 # --- 設定 ------------------------------------------------------------
 # 確認したい KINDAL のページURL（まずはトップページ）
 TARGET_URLS = [
-    # BRING（wastenot）：アンダーカバーの売り場アドレスを確認
-    "https://wastenot-official.com/collections/undercover/products.json?limit=3",
+    # RINKAN：トップページを取得して、隠れAPIの手がかりを探す
+    "https://rinkan-online.com/",
 ]
 
 # 本物のブラウザのふりをするための情報（これがないと弾かれやすい）
