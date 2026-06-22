@@ -23,14 +23,11 @@ import urllib.error
 # --- 設定 ------------------------------------------------------------
 # 確認したい KINDAL のページURL（まずはトップページ）
 TARGET_URLS = [
-    # RINKAN(リンカン) オンライン の候補
-    "https://www.rinkan.com/",
-    "https://rinkan.com/",
-    # セカンドストリート オンライン
-    "https://www.2ndstreet.jp/",
-    # BRING の候補
-    "https://bring-online.com/",
-    "https://www.bring-tokyo.com/",
+    # RINKAN オンライン：トップと Shopify商品JSON を試す
+    "https://rinkan-online.com/",
+    "https://rinkan-online.com/products.json?limit=2",
+    # BRING（wastenot-official）：Shopifyの商品JSONを試す
+    "https://wastenot-official.com/collections/bring/products.json?limit=3",
 ]
 
 # 本物のブラウザのふりをするための情報（これがないと弾かれやすい）
