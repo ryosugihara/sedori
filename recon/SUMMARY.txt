@@ -1,3 +1,7 @@
-KINDAL 接続テスト  実行時刻: 2026-06-22 07:53:31
+KINDAL 接続テスト  実行時刻: 2026-06-22 07:54:30
 
-[1] https://rinkan-online.com/  ->  status=200, final=https://rinkan-online.com/, size=634745 bytes
+[1] https://api.rinkan-online.com/  ->  status=404, final=https://api.rinkan-online.com/, size=21 bytes
+[2] https://api.rinkan-online.com/products?per_page=2  ->  status=404, final=https://api.rinkan-online.com/products?per_page=2, size=21 bytes
+[3] https://api.rinkan-online.com/items?per_page=2  ->  status=404, final=https://api.rinkan-online.com/items?per_page=2, size=21 bytes
+[4] https://api.rinkan-online.com/search?per_page=2  ->  status=404, final=https://api.rinkan-online.com/search?per_page=2, size=21 bytes
+[5] https://api.rinkan-online.com/v1/products?per_page=2  ->  status=404, final=https://api.rinkan-online.com/v1/products?per_page=2, size=21 bytes
