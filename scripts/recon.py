@@ -23,10 +23,8 @@ import urllib.error
 # --- 設定 ------------------------------------------------------------
 # 確認したい KINDAL のページURL（まずはトップページ）
 TARGET_URLS = [
-    # BRING（wastenot）：サンローランパリの売り場アドレスを当てる
-    "https://wastenot-official.com/collections/saintlaurentparis/products.json?limit=3",
-    "https://wastenot-official.com/collections/saint-laurent-paris/products.json?limit=3",
-    "https://wastenot-official.com/collections/ysl/products.json?limit=3",
+    # BRING（wastenot）：アンダーカバーの売り場アドレスを確認
+    "https://wastenot-official.com/collections/undercover/products.json?limit=3",
 ]
 
 # 本物のブラウザのふりをするための情報（これがないと弾かれやすい）
