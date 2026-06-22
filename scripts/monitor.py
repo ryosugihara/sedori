@@ -37,6 +37,7 @@ BRING_BRANDS_FILE = "watch_bring.json"        # BRING の見張るブランド�
 BRING_STATE_FILE = "state/bring_seen.json"    # BRING の「見た商品」記録
 
 SOUBA_FILE = "souba.json"                    # メルカリで売れた値段の記録（利益判定に使う）
+EXCLUDE_FILE = "exclude.json"                # 通知から除外する条件
 PER_PAGE = 250                        # 1回の取得件数（Shopifyの最大値）
 MAX_PAGES = 20                        # 安全のための上限（無限ループ防止）
 REQUEST_WAIT = 1.5                    # サイトへの優しさ（アクセスの間に待つ秒数）
@@ -111,6 +112,7 @@ def build_item(product, brand_name, shop_base=SHOP, shop_label="KINDAL"):
         "url": f"{shop_base}/products/{product.get('handle')}",
         "image": images[0].get("src") if images else None,
         "shop": shop_label,
+        "category": product.get("product_type", ""),  # 商品の分類（財布/バッグ等）
     }
 
 
@@ -310,6 +312,34 @@ def send_items(items):
         time.sleep(1)  # 連続で送りすぎない
 
 
+def load_excludes():
+    """通知から除外する条件(exclude.json)を読み込む"""
+    return load_json_file(
+        EXCLUDE_FILE, {"ng_keywords": [], "price_rules": []}
+    )
+
+
+def is_excluded(item, excludes):
+    """この商品が『通知しない』条件に当てはまるか判定する"""
+    # 商品名と分類の両方をまとめて、小文字でチェックする
+    text = (item.get("title", "") + " " + item.get("category", "")).lower()
+    price = item.get("price_num") or 0
+
+    # 1) NGキーワード（含まれていたら除外）
+    for kw in excludes.get("ng_keywords", []):
+        if kw.lower() in text:
+            return True
+
+    # 2) 価格条件（キーワードに合致 かつ price_min 以上 なら除外）
+    for rule in excludes.get("price_rules", []):
+        pmin = rule.get("price_min", 0)
+        kws = rule.get("keywords", [])
+        if price >= pmin and any(k.lower() in text for k in kws):
+            return True
+
+    return False
+
+
 def check_source(brands, seen, first_run, get_items):
     """1つのサイトの全ブランドを1回チェックして、新着リストを返す。
 
@@ -317,6 +347,7 @@ def check_source(brands, seen, first_run, get_items):
     KINDAL でもトレファクでも、この共通処理で扱える。
     """
     new_items = []
+    excludes = load_excludes()  # 通知しない条件を読み込む
     for b in brands:
         # 識別子：KINDALは collection、トレファクは keyword を使う
         key = b.get("collection") or b.get("keyword")
@@ -335,8 +366,11 @@ def check_source(brands, seen, first_run, get_items):
         if first_run:
             print(f"  初回: {key} を {len(current_ids)} 件記録（通知なし）")
         elif fresh:
-            new_items.extend(fresh)
-            print(f"  新着 {len(fresh)} 件: {key}")
+            # 除外条件に当てはまる商品は通知しない（記録には残す）
+            keep = [it for it in fresh if not is_excluded(it, excludes)]
+            skipped = len(fresh) - len(keep)
+            new_items.extend(keep)
+            print(f"  新着 {len(fresh)} 件: {key}（うち除外 {skipped} 件）")
 
         # 見た商品リストを更新（今ある商品IDを全部覚える）
         seen[key] = sorted(seen_ids | set(current_ids))
