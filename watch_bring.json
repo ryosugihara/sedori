@@ -1,0 +1,7 @@
+{
+  "_メモ": "BRING(wastenot)で見張るブランド。name=通知名 / collection=wastenotの売り場handle。空の売り場はスキップされるので安全です。",
+  "brands": [
+    { "name": "Saint Laurent", "collection": "yvessaintlaurent" },
+    { "name": "Saint Laurent", "collection": "saintlaurentparis" }
+  ]
+}

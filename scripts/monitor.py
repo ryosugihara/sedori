@@ -32,6 +32,10 @@ STATE_FILE = "state/seen.json"        # KINDAL の「見た商品」記録
 TREFAC_BRANDS_FILE = "watch_trefac.json"     # トレファク の見張るブランド一覧
 TREFAC_STATE_FILE = "state/trefac_seen.json" # トレファク の「見た商品」記録
 
+BRING_SHOP = "https://wastenot-official.com"  # BRING(wastenot) 通販サイト（Shopify）
+BRING_BRANDS_FILE = "watch_bring.json"        # BRING の見張るブランド一覧
+BRING_STATE_FILE = "state/bring_seen.json"    # BRING の「見た商品」記録
+
 SOUBA_FILE = "souba.json"                    # メルカリで売れた値段の記録（利益判定に使う）
 PER_PAGE = 250                        # 1回の取得件数（Shopifyの最大値）
 MAX_PAGES = 20                        # 安全のための上限（無限ループ防止）
@@ -61,11 +65,11 @@ def http_get_json(url):
         return json.loads(res.read().decode("utf-8"))
 
 
-def fetch_collection_products(handle):
-    """あるブランド(売り場)の全商品を、ページをめくりながら取得して返す"""
+def fetch_collection_products(handle, shop_base=SHOP):
+    """あるShopify店の、あるブランド(売り場)の全商品をページめくりで取得して返す"""
     all_products = []
     for page in range(1, MAX_PAGES + 1):
-        url = f"{SHOP}/collections/{handle}/products.json?limit={PER_PAGE}&page={page}"
+        url = f"{shop_base}/collections/{handle}/products.json?limit={PER_PAGE}&page={page}"
         try:
             data = http_get_json(url)
         except Exception as e:
@@ -89,8 +93,8 @@ def yen(price_str):
         return f"¥{price_str}"
 
 
-def build_item(product, brand_name):
-    """KINDAL の商品データから、通知に使う情報だけを取り出す"""
+def build_item(product, brand_name, shop_base=SHOP, shop_label="KINDAL"):
+    """Shopify の商品データから、通知に使う情報だけを取り出す"""
     variants = product.get("variants") or [{}]
     images = product.get("images") or []
     raw_price = variants[0].get("price", "")
@@ -104,16 +108,22 @@ def build_item(product, brand_name):
         "title": product.get("title", "(名前なし)"),
         "price": yen(raw_price),
         "price_num": price_num,
-        "url": f"{SHOP}/products/{product.get('handle')}",
+        "url": f"{shop_base}/products/{product.get('handle')}",
         "image": images[0].get("src") if images else None,
-        "shop": "KINDAL",
+        "shop": shop_label,
     }
 
 
 def kindal_items(brand):
     """KINDAL の1ブランドの全商品を、通知用の形(idつき)で返す"""
-    products = fetch_collection_products(brand["collection"])
-    return [build_item(p, brand["name"]) for p in products]
+    products = fetch_collection_products(brand["collection"], SHOP)
+    return [build_item(p, brand["name"], SHOP, "KINDAL") for p in products]
+
+
+def bring_items(brand):
+    """BRING(wastenot) の1ブランドの全商品を、通知用の形(idつき)で返す"""
+    products = fetch_collection_products(brand["collection"], BRING_SHOP)
+    return [build_item(p, brand["name"], BRING_SHOP, "BRING") for p in products]
 
 
 def load_json_file(path, default):
@@ -335,32 +345,37 @@ def check_source(brands, seen, first_run, get_items):
 
 
 def main():
-    # 見張るブランド一覧を読み込む（KINDAL と トレファク、それぞれ）
+    # 見張るブランド一覧を読み込む（KINDAL・トレファク・BRING）
     kindal_brands = load_json_file(BRANDS_FILE, {"brands": []}).get("brands", [])
     trefac_brands = load_json_file(TREFAC_BRANDS_FILE, {"brands": []}).get("brands", [])
+    bring_brands = load_json_file(BRING_BRANDS_FILE, {"brands": []}).get("brands", [])
 
     # これまでに「見た商品」の記録を読み込む（サイトごとに別ファイル）
     kindal_seen = load_json_file(STATE_FILE, {})
     trefac_seen = load_json_file(TREFAC_STATE_FILE, {})
+    bring_seen = load_json_file(BRING_STATE_FILE, {})
     kindal_first = (len(kindal_seen) == 0)  # 記録が空っぽなら初回
     trefac_first = (len(trefac_seen) == 0)
+    bring_first = (len(bring_seen) == 0)
 
-    def one_pass(k_first, t_first):
-        """両サイトを1回ずつチェックして、新着をまとめて返す"""
+    def one_pass(k_first, t_first, b_first):
+        """全サイトを1回ずつチェックして、新着をまとめて返す"""
         new = []
         new += check_source(kindal_brands, kindal_seen, k_first, kindal_items)
         new += check_source(trefac_brands, trefac_seen, t_first, trefac.fetch_brand_items)
+        new += check_source(bring_brands, bring_seen, b_first, bring_items)
         return new
 
     def save_all():
         save_json_file(STATE_FILE, kindal_seen)
         save_json_file(TREFAC_STATE_FILE, trefac_seen)
+        save_json_file(BRING_STATE_FILE, bring_seen)
 
     def start_message():
-        names = sorted({b["name"] for b in kindal_brands + trefac_brands})
+        names = sorted({b["name"] for b in kindal_brands + trefac_brands + bring_brands})
         send_text(
             "✅ 新着監視を開始/更新しました！\n"
-            "監視中の店: KINDAL、トレファク\n"
+            "監視中の店: KINDAL、トレファク、BRING\n"
             f"対象ブランド: {'、'.join(names)}\n"
             f"これから約{POLL_SECONDS}秒ごとに新着をチェックします。"
         )
@@ -370,8 +385,8 @@ def main():
 
     # --- 1回だけチェックするモード（手動の動作確認用）---
     if not loop_mode:
-        new_items = one_pass(kindal_first, trefac_first)
-        if kindal_first or trefac_first:
+        new_items = one_pass(kindal_first, trefac_first, bring_first)
+        if kindal_first or trefac_first or bring_first:
             start_message()
         if new_items:
             send_items(new_items)
@@ -384,8 +399,8 @@ def main():
     end_time = time.time() + LOOP_MINUTES * 60
 
     # まず最初の1回チェック
-    new_items = one_pass(kindal_first, trefac_first)
-    if kindal_first or trefac_first:
+    new_items = one_pass(kindal_first, trefac_first, bring_first)
+    if kindal_first or trefac_first or bring_first:
         start_message()
     if new_items:
         send_items(new_items)
@@ -395,7 +410,7 @@ def main():
     # 決めた時間内は、くり返しチェックし続ける（2回目以降は初回扱いしない）
     while time.time() < end_time:
         time.sleep(POLL_SECONDS)
-        items = one_pass(False, False)
+        items = one_pass(False, False, False)
         if items:
             print(f"新着 {len(items)} 件 → 通知")
             send_items(items)
