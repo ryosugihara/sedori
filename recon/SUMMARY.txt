@@ -1,7 +1,5 @@
-KINDAL 接続テスト  実行時刻: 2026-06-22 07:22:17
+KINDAL 接続テスト  実行時刻: 2026-06-22 07:27:38
 
-[1] https://www.rinkan.com/  ->  status=None, final=https://www.rinkan.com/, size=46 bytes
-[2] https://rinkan.com/  ->  status=None, final=https://rinkan.com/, size=46 bytes
-[3] https://www.2ndstreet.jp/  ->  status=403, final=https://www.2ndstreet.jp/, size=370 bytes
-[4] https://bring-online.com/  ->  status=None, final=https://bring-online.com/, size=90 bytes
-[5] https://www.bring-tokyo.com/  ->  status=None, final=https://www.bring-tokyo.com/, size=52 bytes
+[1] https://rinkan-online.com/  ->  status=200, final=https://rinkan-online.com/, size=634745 bytes
+[2] https://rinkan-online.com/products.json?limit=2  ->  status=404, final=https://rinkan-online.com/products.json?limit=2, size=622736 bytes
+[3] https://wastenot-official.com/collections/bring/products.json?limit=3  ->  status=200, final=https://wastenot-official.com/collections/bring/products.json?limit=3, size=9963 bytes
