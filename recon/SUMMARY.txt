@@ -1,19 +1,7 @@
-KINDAL 接続テスト  実行時刻: 2026-06-22 07:55:58
+KINDAL 接続テスト  実行時刻: 2026-06-22 07:57:30
 
-[1] https://rinkan-online.com/_nuxt/BDLjUawg.js  ->  status=200, final=https://rinkan-online.com/_nuxt/BDLjUawg.js, size=489 bytes
-[2] https://rinkan-online.com/_nuxt/BLDb1qco.js  ->  status=200, final=https://rinkan-online.com/_nuxt/BLDb1qco.js, size=872 bytes
-[3] https://rinkan-online.com/_nuxt/BZ0YQrvs.js  ->  status=200, final=https://rinkan-online.com/_nuxt/BZ0YQrvs.js, size=1126 bytes
-[4] https://rinkan-online.com/_nuxt/BaxCoiWY.js  ->  status=200, final=https://rinkan-online.com/_nuxt/BaxCoiWY.js, size=647 bytes
-[5] https://rinkan-online.com/_nuxt/Bg0erVyt.js  ->  status=200, final=https://rinkan-online.com/_nuxt/Bg0erVyt.js, size=960 bytes
-[6] https://rinkan-online.com/_nuxt/Bm8TjO_z.js  ->  status=200, final=https://rinkan-online.com/_nuxt/Bm8TjO_z.js, size=9053 bytes
-[7] https://rinkan-online.com/_nuxt/BoruePNf.js  ->  status=200, final=https://rinkan-online.com/_nuxt/BoruePNf.js, size=2418 bytes
-[8] https://rinkan-online.com/_nuxt/BsuLOS1M.js  ->  status=200, final=https://rinkan-online.com/_nuxt/BsuLOS1M.js, size=556 bytes
-[9] https://rinkan-online.com/_nuxt/CUbJr5pZ.js  ->  status=200, final=https://rinkan-online.com/_nuxt/CUbJr5pZ.js, size=547 bytes
-[10] https://rinkan-online.com/_nuxt/Cee8RO2v.js  ->  status=200, final=https://rinkan-online.com/_nuxt/Cee8RO2v.js, size=938 bytes
-[11] https://rinkan-online.com/_nuxt/CsmEPUKg.js  ->  status=200, final=https://rinkan-online.com/_nuxt/CsmEPUKg.js, size=578 bytes
-[12] https://rinkan-online.com/_nuxt/DA2T3E47.js  ->  status=200, final=https://rinkan-online.com/_nuxt/DA2T3E47.js, size=2216 bytes
-[13] https://rinkan-online.com/_nuxt/DLcK6xGD.js  ->  status=200, final=https://rinkan-online.com/_nuxt/DLcK6xGD.js, size=530 bytes
-[14] https://rinkan-online.com/_nuxt/DzAyCisf.js  ->  status=200, final=https://rinkan-online.com/_nuxt/DzAyCisf.js, size=862 bytes
-[15] https://rinkan-online.com/_nuxt/GfxhQup1.js  ->  status=200, final=https://rinkan-online.com/_nuxt/GfxhQup1.js, size=464210 bytes
-[16] https://rinkan-online.com/_nuxt/PyeX-boM.js  ->  status=200, final=https://rinkan-online.com/_nuxt/PyeX-boM.js, size=2352 bytes
-[17] https://rinkan-online.com/_nuxt/aE8Y-nmi.js  ->  status=200, final=https://rinkan-online.com/_nuxt/aE8Y-nmi.js, size=164100 bytes
+[1] https://api.rinkan-online.com/api/brands/public  ->  status=200, final=https://api.rinkan-online.com/api/brands/public, size=9838 bytes
+[2] https://api.rinkan-online.com/brands/public  ->  status=404, final=https://api.rinkan-online.com/brands/public, size=21 bytes
+[3] https://api.rinkan-online.com/api/products?per_page=2  ->  status=404, final=https://api.rinkan-online.com/api/products?per_page=2, size=21 bytes
+[4] https://api.rinkan-online.com/api/v2/products?per_page=2  ->  status=404, final=https://api.rinkan-online.com/api/v2/products?per_page=2, size=21 bytes
+[5] https://api.rinkan-online.com/api/search?keyword=saint%20laurent&per_page=2  ->  status=200, final=https://api.rinkan-online.com/api/search?keyword=saint%20laurent&per_page=2, size=25094 bytes
