@@ -340,6 +340,16 @@ def is_excluded(item, excludes):
     return False
 
 
+def matches_only(item, only_keywords):
+    """ブランドに『この言葉を含む物だけ通知』指定がある場合の判定。
+    指定が無ければ常にTrue（全部通知）。例: Undercoverは『デニム』だけ。
+    """
+    if not only_keywords:
+        return True
+    text = (item.get("title", "") + " " + item.get("category", "")).lower()
+    return any(k.lower() in text for k in only_keywords)
+
+
 def check_source(brands, seen, first_run, get_items):
     """1つのサイトの全ブランドを1回チェックして、新着リストを返す。
 
@@ -357,20 +367,27 @@ def check_source(brands, seen, first_run, get_items):
             print(f"  取得失敗 ({key}): {e}")
             continue
 
+        # このブランドを今までに記録したことがあるか（新規追加ブランドの判定）
+        known = key in seen
         # IDは文字列にそろえて比較する（サイトによって数値/文字が混在するため）
         current_ids = [str(it["id"]) for it in items if it.get("id") is not None]
         seen_ids = set(str(x) for x in seen.get(key, []))
         # 「前に見ていない＝新着」の商品を抜き出す
         fresh = [it for it in items if str(it.get("id")) not in seen_ids]
 
-        if first_run:
-            print(f"  初回: {key} を {len(current_ids)} 件記録（通知なし）")
+        # 全体の初回、または新しく追加したブランドは、記録だけして通知しない
+        if first_run or not known:
+            print(f"  初回/新規: {key} を {len(current_ids)} 件記録（通知なし）")
         elif fresh:
-            # 除外条件に当てはまる商品は通知しない（記録には残す）
-            keep = [it for it in fresh if not is_excluded(it, excludes)]
+            only_kw = b.get("only_keywords")  # 例: Undercoverは「デニム」だけ
+            # 除外条件に当てはまらず、かつ（指定があれば）対象の言葉を含む物だけ通知
+            keep = [
+                it for it in fresh
+                if not is_excluded(it, excludes) and matches_only(it, only_kw)
+            ]
             skipped = len(fresh) - len(keep)
             new_items.extend(keep)
-            print(f"  新着 {len(fresh)} 件: {key}（うち除外 {skipped} 件）")
+            print(f"  新着 {len(fresh)} 件: {key}（通知 {len(keep)} / 対象外 {skipped}）")
 
         # 見た商品リストを更新（今ある商品IDを全部覚える）
         seen[key] = sorted(seen_ids | set(current_ids))
