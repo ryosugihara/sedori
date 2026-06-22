@@ -23,8 +23,14 @@ import urllib.error
 # --- 設定 ------------------------------------------------------------
 # 確認したい KINDAL のページURL（まずはトップページ）
 TARGET_URLS = [
-    # メルカリ: サンローランの「売り切れ(売れた)」検索。データが取れるか/ブロックされるか調査
-    "https://jp.mercari.com/search?keyword=Saint%20Laurent&status=sold_out",
+    # RINKAN(リンカン) オンライン の候補
+    "https://www.rinkan.com/",
+    "https://rinkan.com/",
+    # セカンドストリート オンライン
+    "https://www.2ndstreet.jp/",
+    # BRING の候補
+    "https://bring-online.com/",
+    "https://www.bring-tokyo.com/",
 ]
 
 # 本物のブラウザのふりをするための情報（これがないと弾かれやすい）
