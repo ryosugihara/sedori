@@ -23,12 +23,23 @@ import urllib.error
 # --- 設定 ------------------------------------------------------------
 # 確認したい KINDAL のページURL（まずはトップページ）
 TARGET_URLS = [
-    # RINKAN API：商品一覧のエンドポイントを探す
-    "https://api.rinkan-online.com/",
-    "https://api.rinkan-online.com/products?per_page=2",
-    "https://api.rinkan-online.com/items?per_page=2",
-    "https://api.rinkan-online.com/search?per_page=2",
-    "https://api.rinkan-online.com/v1/products?per_page=2",
+    "https://rinkan-online.com/_nuxt/BDLjUawg.js",
+    "https://rinkan-online.com/_nuxt/BLDb1qco.js",
+    "https://rinkan-online.com/_nuxt/BZ0YQrvs.js",
+    "https://rinkan-online.com/_nuxt/BaxCoiWY.js",
+    "https://rinkan-online.com/_nuxt/Bg0erVyt.js",
+    "https://rinkan-online.com/_nuxt/Bm8TjO_z.js",
+    "https://rinkan-online.com/_nuxt/BoruePNf.js",
+    "https://rinkan-online.com/_nuxt/BsuLOS1M.js",
+    "https://rinkan-online.com/_nuxt/CUbJr5pZ.js",
+    "https://rinkan-online.com/_nuxt/Cee8RO2v.js",
+    "https://rinkan-online.com/_nuxt/CsmEPUKg.js",
+    "https://rinkan-online.com/_nuxt/DA2T3E47.js",
+    "https://rinkan-online.com/_nuxt/DLcK6xGD.js",
+    "https://rinkan-online.com/_nuxt/DzAyCisf.js",
+    "https://rinkan-online.com/_nuxt/GfxhQup1.js",
+    "https://rinkan-online.com/_nuxt/PyeX-boM.js",
+    "https://rinkan-online.com/_nuxt/aE8Y-nmi.js",
 ]
 
 # 本物のブラウザのふりをするための情報（これがないと弾かれやすい）
