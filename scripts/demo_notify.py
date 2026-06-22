@@ -10,8 +10,8 @@ import monitor  # 通知の送信・取得部品を再利用
 
 DEMO_COUNT = 3  # デモで送る件数
 
-# BRING(wastenot)のサンローランを取得し、先頭から数件を選ぶ
-items = monitor.bring_items({"name": "Saint Laurent", "collection": "yvessaintlaurent"})
+# BRING(wastenot)のサンローランパリを取得し、先頭から数件を選ぶ
+items = monitor.bring_items({"name": "Saint Laurent", "collection": "saintlaurentparis"})
 items = items[:DEMO_COUNT]
 
 # まず説明を送ってから、本物と同じカード形式で通知する
