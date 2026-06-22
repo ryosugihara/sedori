@@ -3,9 +3,14 @@ name: KINDAL新着監視
 
 on:
   schedule:
-    # 30分ごとに「新しい見張り」を開始する（前の見張りは約27分で終わる）
+    # 30分ごとに「新しい見張り」を開始する（バックアップ用。普段はPATで自動再起動）
     - cron: "*/30 * * * *"
   workflow_dispatch: # 手動でも開始できる
+    inputs:
+      loop_minutes:
+        description: "1回の監視時間(分)。テスト用に短くもできる"
+        default: "300"
+        required: false
 
 permissions:
   contents: write
@@ -33,7 +38,7 @@ jobs:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           LOOP_MODE: "1" # ループ監視を有効にする
           POLL_SECONDS: "30" # 何秒ごとにチェックするか（小さいほど速い／サイトに優しくするなら大きく）
-          LOOP_MINUTES: "300" # 1回の見張り時間（5時間。止まる隙間を減らす）
+          LOOP_MINUTES: ${{ github.event.inputs.loop_minutes || '300' }} # 1回の見張り時間（分）
         run: python scripts/monitor.py
 
       - name: 見た商品リストを保存
