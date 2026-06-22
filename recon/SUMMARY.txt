@@ -1,5 +1,5 @@
-KINDAL 接続テスト  実行時刻: 2026-06-22 07:32:45
+KINDAL 接続テスト  実行時刻: 2026-06-22 07:39:49
 
-[1] https://wastenot-official.com/collections/saintlaurent/products.json?limit=3  ->  status=200, final=https://wastenot-official.com/collections/saintlaurent/products.json?limit=3, size=15 bytes
-[2] https://wastenot-official.com/collections/yvessaintlaurent/products.json?limit=3  ->  status=200, final=https://wastenot-official.com/collections/yvessaintlaurent/products.json?limit=3, size=9295 bytes
-[3] https://wastenot-official.com/collections/saint-laurent/products.json?limit=3  ->  status=200, final=https://wastenot-official.com/collections/saint-laurent/products.json?limit=3, size=15 bytes
+[1] https://wastenot-official.com/collections/saintlaurentparis/products.json?limit=3  ->  status=200, final=https://wastenot-official.com/collections/saintlaurentparis/products.json?limit=3, size=9833 bytes
+[2] https://wastenot-official.com/collections/saint-laurent-paris/products.json?limit=3  ->  status=200, final=https://wastenot-official.com/collections/saint-laurent-paris/products.json?limit=3, size=15 bytes
+[3] https://wastenot-official.com/collections/ysl/products.json?limit=3  ->  status=200, final=https://wastenot-official.com/collections/ysl/products.json?limit=3, size=15 bytes
