@@ -1,3 +1,7 @@
-KINDAL 接続テスト  実行時刻: 2026-06-20 08:13:44
+KINDAL 接続テスト  実行時刻: 2026-06-22 07:22:17
 
-[1] https://jp.mercari.com/search?keyword=Saint%20Laurent&status=sold_out  ->  status=200, final=https://jp.mercari.com/search?keyword=Saint%20Laurent&status=sold_out, size=544414 bytes
+[1] https://www.rinkan.com/  ->  status=None, final=https://www.rinkan.com/, size=46 bytes
+[2] https://rinkan.com/  ->  status=None, final=https://rinkan.com/, size=46 bytes
+[3] https://www.2ndstreet.jp/  ->  status=403, final=https://www.2ndstreet.jp/, size=370 bytes
+[4] https://bring-online.com/  ->  status=None, final=https://bring-online.com/, size=90 bytes
+[5] https://www.bring-tokyo.com/  ->  status=None, final=https://www.bring-tokyo.com/, size=52 bytes
