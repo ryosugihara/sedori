@@ -24,6 +24,7 @@ import urllib.parse
 
 import trefac  # トレファク用の読み取り部品（同じフォルダの trefac.py）
 import rinkan  # RINKAN用の読み取り部品（同じフォルダの rinkan.py）
+import hardoff  # おふもーる(ハードオフ)用の読み取り部品（同じフォルダの hardoff.py）
 
 # --- 設定（ここの数字や名前を変えれば動きを調整できます）-------------------
 SHOP = "https://shop.kind.co.jp"      # KINDAL 通販サイトのアドレス
@@ -39,6 +40,9 @@ BRING_STATE_FILE = "state/bring_seen.json"    # BRING の「見た商品」記�
 
 RINKAN_BRANDS_FILE = "watch_rinkan.json"      # RINKAN の見張るブランド一覧
 RINKAN_STATE_FILE = "state/rinkan_seen.json"  # RINKAN の「見た商品」記録
+
+HARDOFF_BRANDS_FILE = "watch_hardoff.json"      # おふもーる の見張るブランド一覧
+HARDOFF_STATE_FILE = "state/hardoff_seen.json"  # おふもーる の「見た商品」記録
 
 SOUBA_FILE = "souba.json"                    # メルカリで売れた値段の記録（利益判定に使う）
 EXCLUDE_FILE = "exclude.json"                # 通知から除外する条件
@@ -405,24 +409,28 @@ def main():
     trefac_brands = load_json_file(TREFAC_BRANDS_FILE, {"brands": []}).get("brands", [])
     bring_brands = load_json_file(BRING_BRANDS_FILE, {"brands": []}).get("brands", [])
     rinkan_brands = load_json_file(RINKAN_BRANDS_FILE, {"brands": []}).get("brands", [])
+    hardoff_brands = load_json_file(HARDOFF_BRANDS_FILE, {"brands": []}).get("brands", [])
 
     # これまでに「見た商品」の記録を読み込む（サイトごとに別ファイル）
     kindal_seen = load_json_file(STATE_FILE, {})
     trefac_seen = load_json_file(TREFAC_STATE_FILE, {})
     bring_seen = load_json_file(BRING_STATE_FILE, {})
     rinkan_seen = load_json_file(RINKAN_STATE_FILE, {})
+    hardoff_seen = load_json_file(HARDOFF_STATE_FILE, {})
     kindal_first = (len(kindal_seen) == 0)  # 記録が空っぽなら初回
     trefac_first = (len(trefac_seen) == 0)
     bring_first = (len(bring_seen) == 0)
     rinkan_first = (len(rinkan_seen) == 0)
+    hardoff_first = (len(hardoff_seen) == 0)
 
-    def one_pass(k_first, t_first, b_first, r_first):
+    def one_pass(k_first, t_first, b_first, r_first, h_first):
         """全サイトを1回ずつチェックして、新着をまとめて返す"""
         new = []
         new += check_source(kindal_brands, kindal_seen, k_first, kindal_items)
         new += check_source(trefac_brands, trefac_seen, t_first, trefac.fetch_brand_items)
         new += check_source(bring_brands, bring_seen, b_first, bring_items)
         new += check_source(rinkan_brands, rinkan_seen, r_first, rinkan.fetch_brand_items)
+        new += check_source(hardoff_brands, hardoff_seen, h_first, hardoff.fetch_brand_items)
         return new
 
     def save_all():
@@ -430,13 +438,16 @@ def main():
         save_json_file(TREFAC_STATE_FILE, trefac_seen)
         save_json_file(BRING_STATE_FILE, bring_seen)
         save_json_file(RINKAN_STATE_FILE, rinkan_seen)
+        save_json_file(HARDOFF_STATE_FILE, hardoff_seen)
 
     def start_message():
-        all_brands = kindal_brands + trefac_brands + bring_brands + rinkan_brands
+        all_brands = (
+            kindal_brands + trefac_brands + bring_brands + rinkan_brands + hardoff_brands
+        )
         names = sorted({b["name"] for b in all_brands})
         send_text(
             "✅ 新着監視を開始/更新しました！\n"
-            "監視中の店: KINDAL、トレファク、BRING、RINKAN\n"
+            "監視中の店: KINDAL、トレファク、BRING、RINKAN、オフモール\n"
             f"対象ブランド: {'、'.join(names)}\n"
             f"これから約{POLL_SECONDS}秒ごとに新着をチェックします。"
         )
@@ -446,8 +457,8 @@ def main():
 
     # --- 1回だけチェックするモード（手動の動作確認用）---
     if not loop_mode:
-        new_items = one_pass(kindal_first, trefac_first, bring_first, rinkan_first)
-        if kindal_first or trefac_first or bring_first or rinkan_first:
+        new_items = one_pass(kindal_first, trefac_first, bring_first, rinkan_first, hardoff_first)
+        if kindal_first or trefac_first or bring_first or rinkan_first or hardoff_first:
             start_message()
         if new_items:
             send_items(new_items)
@@ -460,8 +471,8 @@ def main():
     end_time = time.time() + LOOP_MINUTES * 60
 
     # まず最初の1回チェック
-    new_items = one_pass(kindal_first, trefac_first, bring_first, rinkan_first)
-    if kindal_first or trefac_first or bring_first or rinkan_first:
+    new_items = one_pass(kindal_first, trefac_first, bring_first, rinkan_first, hardoff_first)
+    if kindal_first or trefac_first or bring_first or rinkan_first or hardoff_first:
         start_message()
     if new_items:
         send_items(new_items)
@@ -471,7 +482,7 @@ def main():
     # 決めた時間内は、くり返しチェックし続ける（2回目以降は初回扱いしない）
     while time.time() < end_time:
         time.sleep(POLL_SECONDS)
-        items = one_pass(False, False, False, False)
+        items = one_pass(False, False, False, False, False)
         if items:
             print(f"新着 {len(items)} 件 → 通知")
             send_items(items)

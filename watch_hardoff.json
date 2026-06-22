@@ -1,0 +1,7 @@
+{
+  "_メモ": "おふもーる(ハードオフ ネットモール)で見張るブランド。name=通知名 / keyword=検索語。only_keywordsがあればその言葉を含む物だけ通知。",
+  "brands": [
+    { "name": "Saint Laurent", "keyword": "SAINT LAURENT" },
+    { "name": "Undercover", "keyword": "UNDERCOVER", "only_keywords": ["デニム", "denim", "ジーンズ", "jeans"] }
+  ]
+}
