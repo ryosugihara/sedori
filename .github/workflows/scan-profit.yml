@@ -1,0 +1,34 @@
+# 在庫スキャン：②ブランドの「今ある出品」から利益が出そうな商品を1回だけ探して通知
+# （新着監視とは別。手動で実行する棚卸し用）
+name: 在庫スキャン(利益さがし)
+
+on:
+  workflow_dispatch: # 手動で実行する
+    inputs:
+      scan_max:
+        description: "通知する最大件数（多すぎ防止）"
+        default: "30"
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: リポジトリを取得
+        uses: actions/checkout@v4
+
+      - name: Pythonを準備
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 在庫スキャンを実行
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          SCAN_PROFIT: "1" # 棚卸しスキャンモード
+          SCAN_MAX: ${{ github.event.inputs.scan_max || '30' }}
+        run: python scripts/monitor.py
