@@ -1,7 +1,20 @@
 {
-  "_メモ": "おふもーる(ハードオフ ネットモール)で見張るブランド。name=通知名 / keyword=検索語。only_keywordsがあればその言葉を含む物だけ通知。",
+  "_メモ": "おふもーる(ハードオフ ネットモール)で見張るブランド。name=通知名 / keyword=検索語。only_keywords=その言葉を含む物だけ通知。profit_only=true は『予想利益が2000円以上の時だけ通知』(売却済みDBで予測)。",
   "brands": [
     { "name": "Saint Laurent", "keyword": "SAINT LAURENT" },
-    { "name": "Undercover", "keyword": "UNDERCOVER", "only_keywords": ["デニム", "denim", "ジーンズ", "jeans"] }
+    { "name": "Undercover", "keyword": "UNDERCOVER", "only_keywords": ["デニム", "denim", "ジーンズ", "jeans"] },
+    { "name": "Dior Homme", "keyword": "DIOR HOMME", "profit_only": true },
+    { "name": "NUMBER (N)INE", "keyword": "NUMBER NINE", "profit_only": true },
+    { "name": "Balmain", "keyword": "BALMAIN", "profit_only": true },
+    { "name": "beauty:beast", "keyword": "beauty beast", "profit_only": true },
+    { "name": "Rick Owens", "keyword": "RICK OWENS", "profit_only": true },
+    { "name": "JUNYA WATANABE COMME des GARCONS", "keyword": "JUNYA WATANABE", "profit_only": true },
+    { "name": "GUCCI", "keyword": "GUCCI", "profit_only": true },
+    { "name": "DIESEL", "keyword": "DIESEL", "profit_only": true },
+    { "name": "Hysteric Glamour", "keyword": "HYSTERIC GLAMOUR", "profit_only": true },
+    { "name": "Givenchy", "keyword": "GIVENCHY", "profit_only": true },
+    { "name": "COMME des GARCONS SHIRT", "keyword": "COMME des GARCONS SHIRT", "profit_only": true },
+    { "name": "Versace", "keyword": "VERSACE", "profit_only": true },
+    { "name": "PRADA", "keyword": "PRADA", "profit_only": true }
   ]
 }

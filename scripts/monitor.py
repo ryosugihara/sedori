@@ -46,6 +46,7 @@ HARDOFF_STATE_FILE = "state/hardoff_seen.json"  # おふもーる の「見た�
 
 SOUBA_FILE = "souba.json"                    # メルカリで売れた値段の記録（利益判定に使う）
 EXCLUDE_FILE = "exclude.json"                # 通知から除外する条件
+SOLD_DB_FILE = "data/sold/sold_items.json"   # 売却済み商品DB（画像から抽出した相場・Phase2で予測に使う）
 PER_PAGE = 250                        # 1回の取得件数（Shopifyの最大値）
 MAX_PAGES = 20                        # 安全のための上限（無限ループ防止）
 REQUEST_WAIT = 1.5                    # サイトへの優しさ（アクセスの間に待つ秒数）
@@ -220,8 +221,125 @@ def load_souba():
         "shipping": s.get("想定送料", 800),            # 送料の想定
         "high": s.get("利益見込み_高ライン_円", 20000),
         "mid": s.get("利益見込み_中ライン_円", 3000),
+        "notify_line": s.get("利益通知ライン_円", 2000),  # ②ブランドはこの利益以上だけ通知
         "records": data.get("records", []),
     }
+
+
+# ===== ここから「売却済みDBによる相場予測(Phase 2)」=================
+# メルカリで売れた実例(data/sold/sold_items.json)を使って、
+# 新着商品の「予想相場」と「予想利益」をざっくり計算します。
+
+# 商品の種類を見分けるための言葉（上から順に当てはめる＝先にある方が優先）。
+# 例:「デニムジャケット」は先に『ジャケット』に当たるので“デニム”ではなく“ジャケット”。
+CATEGORY_RULES = [
+    ("バッグ", ["バッグ", "バック", "かばん", "カバン", "bag", "ポーチ"]),
+    ("帽子", ["ニット帽", "ビーニー", "beanie", "キャップ", "cap", "ハット", "帽子"]),
+    ("ジャケット", ["ジャケット", "jacket", "ライダース", "riders", "ブルゾン",
+                   "コート", "coat", "アウター", "ダウン", "down", "ダッフル",
+                   "n2b", "モッズ", "mods"]),
+    ("パーカー", ["パーカー", "hoodie", "フーディ", "スウェット", "sweat"]),
+    ("ニット", ["ニット", "knit", "セーター", "sweater", "カーディガン",
+               "cardigan", "モヘア"]),
+    ("ロングスリーブ", ["ロングスリーブ", "longsleeve", "ロンt", "長袖"]),
+    ("Tシャツ", ["tシャツ", "ティーシャツ", "t-shirt", "tee", "カットソー", "半袖"]),
+    ("シャツ", ["シャツ", "shirt", "ブラウス", "ポロ", "polo"]),
+    ("スカーフ", ["スカーフ", "scarf", "ストール", "マフラー", "muffler"]),
+    ("ベルト", ["ベルト", "belt"]),
+    ("ブレスレット", ["ブレス", "bracelet", "リストバンド", "wristband",
+                     "バングル", "bangle"]),
+    ("ネックレス", ["ネックレス", "necklace", "ペンダント"]),
+    ("デニム", ["デニム", "denim", "jeans", "ジーンズ", "スキニー", "skinny"]),
+    ("パンツ", ["パンツ", "pants", "スラックス", "トラウザー", "チノ",
+               "ショーツ", "shorts"]),
+]
+
+_sold_cache = None  # 売却済みDBを1度だけ読んで覚えておく入れ物
+
+
+def load_sold_db():
+    """売却済み商品DBを読み込む（2回目以降は覚えた中身を返す）"""
+    global _sold_cache
+    if _sold_cache is None:
+        data = load_json_file(SOLD_DB_FILE, {"items": []})
+        _sold_cache = data.get("items", [])
+    return _sold_cache
+
+
+def norm_brand(name):
+    """ブランド名を比較しやすい形にする（小文字＋英数字だけ）。
+    例: 'NUMBER (N)INE' → 'numbernine' / 'beauty:beast' → 'beautybeast'
+    """
+    return re.sub(r"[^a-z0-9]", "", (name or "").lower())
+
+
+def categorize(text):
+    """商品名や種類の文字から、商品の種類(デニム/Tシャツ等)を1つ見つける"""
+    t = (text or "").lower()
+    for cat, kws in CATEGORY_RULES:
+        for kw in kws:
+            if kw.lower() in t:
+                return cat
+    return None
+
+
+def predict_profit(item, souba):
+    """売却済みDBと照らして『予想相場・予想利益』を計算する。
+    同じブランド かつ 同じ種類 の売却実例が無ければ None（予測できない）。
+    """
+    buy = item.get("price_num")
+    if not buy:
+        return None  # 仕入値が分からなければ予測しない
+
+    bn = norm_brand(item.get("brand", ""))
+    cat = categorize((item.get("title", "") + " " + item.get("category", "")))
+    if not cat:
+        return None  # 種類が判定できなければ予測しない
+
+    db = load_sold_db()
+    # 同じブランド・同じ種類で売れた実例だけを集める
+    matched = [
+        r for r in db
+        if norm_brand(r.get("brand", "")) == bn
+        and categorize(r.get("item_type", "")) == cat
+    ]
+    if not matched:
+        return None
+
+    # 売れた値段の「真ん中の値(中央値)」を予想相場とする（極端な値に振られにくい）
+    prices = sorted(r.get("sold_price", 0) for r in matched)
+    sell = prices[len(prices) // 2]
+
+    fee, ship = souba["fee"], souba["shipping"]
+    net = int(sell * (1 - fee) - ship)  # メルカリ手取り
+    profit = net - buy                  # 予想利益
+    return {
+        "sell": sell,
+        "net": net,
+        "profit": profit,
+        "count": len(matched),
+        "cat": cat,
+    }
+
+
+def prediction_lines(item, souba):
+    """予測結果(予想相場・予想利益)を通知カード用の文章にする。予測が無ければ空。"""
+    pred = item.get("prediction")
+    if not pred:
+        return ""
+    profit = pred["profit"]
+    if profit >= souba["high"]:
+        mark = "🟢 高"
+    elif profit >= souba["mid"]:
+        mark = "🟡 中"
+    else:
+        mark = "🔴 低"
+    return (
+        f"🎯 予想相場 ¥{pred['sell']:,}（{pred['cat']} / 実例{pred['count']}件）\n"
+        f"💰 予想利益 約¥{profit:,}（利益見込み: {mark}）"
+    )
+
+# ===== ここまで(Phase 2) ============================================
 
 
 def extract_item_name(title):
@@ -270,7 +388,12 @@ def profit_lines(item, souba):
             f"（手数料{int(fee * 100)}%+送料¥{ship}想定）"
         )
 
-    # 2) 相場メモに一致したら、利益見込み(高/中/低)を出す
+    # 2) 売却済みDBの予測(予想相場・予想利益)があれば出す（Phase 2）
+    pred_text = prediction_lines(item, souba)
+    if pred_text:
+        lines.append(pred_text)
+
+    # 3) 相場メモに一致したら、利益見込み(高/中/低)を出す
     rec = match_souba(item, souba["records"])
     if rec and buy:
         sell = rec["mercari_price"]
@@ -286,7 +409,7 @@ def profit_lines(item, souba):
             f"💹 相場¥{sell:,} → 手取り¥{net:,} / 利益 約¥{profit:,}（利益見込み: {mark}）"
         )
 
-    # 3) ワンタップの相場リンク（常に付ける）
+    # 4) ワンタップの相場リンク（常に付ける）
     lines.append(f"🔍 [メルカリ相場を見る]({mercari_search_url(item)})")
     return "\n".join(lines)
 
@@ -358,15 +481,23 @@ def matches_only(item, only_keywords):
     return any(k.lower() in text for k in only_keywords)
 
 
-def check_source(brands, seen, first_run, get_items):
+def check_source(brands, seen, first_run, get_items, do_slow=True):
     """1つのサイトの全ブランドを1回チェックして、新着リストを返す。
 
     get_items(brand) … そのブランドの商品一覧（id付きの辞書リスト）を返す関数。
     KINDAL でもトレファクでも、この共通処理で扱える。
+
+    do_slow … False のときは「利益が出る時だけ通知」する②ブランド
+              (profit_only) をスキップする。①の優先ブランド(サンローラン等)を
+              短い間隔で見張りつつ、②は少し長い間隔で見張るための仕組み。
     """
     new_items = []
     excludes = load_excludes()  # 通知しない条件を読み込む
+    souba = load_souba()        # 利益予測の設定(手数料・送料・通知ライン)
     for b in brands:
+        # ②ブランド(利益が出る時だけ通知)は、ゆっくり巡回の時だけチェックする
+        if b.get("profit_only") and not do_slow:
+            continue
         # 識別子：KINDALは collection、トレファクは keyword を使う
         key = b.get("collection") or b.get("keyword")
         try:
@@ -388,11 +519,23 @@ def check_source(brands, seen, first_run, get_items):
             print(f"  初回/新規: {key} を {len(current_ids)} 件記録（通知なし）")
         elif fresh:
             only_kw = b.get("only_keywords")  # 例: Undercoverは「デニム」だけ
-            # 除外条件に当てはまらず、かつ（指定があれば）対象の言葉を含む物だけ通知
-            keep = [
-                it for it in fresh
-                if not is_excluded(it, excludes) and matches_only(it, only_kw)
-            ]
+            profit_only = b.get("profit_only")  # 例: ②ブランドは利益が出る時だけ
+            keep = []
+            for it in fresh:
+                # まず共通の除外（財布/サングラス等）と only_keywords を確認
+                if is_excluded(it, excludes):
+                    continue
+                if not matches_only(it, only_kw):
+                    continue
+                # 売却済みDBから予想相場・予想利益を計算（できれば付けておく）
+                pred = predict_profit(it, souba)
+                if pred:
+                    it["prediction"] = pred
+                if profit_only:
+                    # ②ブランドは「予想利益が通知ライン以上」の時だけ通知する
+                    if not pred or pred["profit"] < souba["notify_line"]:
+                        continue
+                keep.append(it)
             skipped = len(fresh) - len(keep)
             new_items.extend(keep)
             print(f"  新着 {len(fresh)} 件: {key}（通知 {len(keep)} / 対象外 {skipped}）")
@@ -423,14 +566,16 @@ def main():
     rinkan_first = (len(rinkan_seen) == 0)
     hardoff_first = (len(hardoff_seen) == 0)
 
-    def one_pass(k_first, t_first, b_first, r_first, h_first):
-        """全サイトを1回ずつチェックして、新着をまとめて返す"""
+    def one_pass(k_first, t_first, b_first, r_first, h_first, do_slow=True):
+        """全サイトを1回ずつチェックして、新着をまとめて返す。
+        do_slow=False のときは②ブランド(利益が出る時だけ通知)を省いて軽く回す。
+        """
         new = []
-        new += check_source(kindal_brands, kindal_seen, k_first, kindal_items)
-        new += check_source(trefac_brands, trefac_seen, t_first, trefac.fetch_brand_items)
-        new += check_source(bring_brands, bring_seen, b_first, bring_items)
-        new += check_source(rinkan_brands, rinkan_seen, r_first, rinkan.fetch_brand_items)
-        new += check_source(hardoff_brands, hardoff_seen, h_first, hardoff.fetch_brand_items)
+        new += check_source(kindal_brands, kindal_seen, k_first, kindal_items, do_slow)
+        new += check_source(trefac_brands, trefac_seen, t_first, trefac.fetch_brand_items, do_slow)
+        new += check_source(bring_brands, bring_seen, b_first, bring_items, do_slow)
+        new += check_source(rinkan_brands, rinkan_seen, r_first, rinkan.fetch_brand_items, do_slow)
+        new += check_source(hardoff_brands, hardoff_seen, h_first, hardoff.fetch_brand_items, do_slow)
         return new
 
     def save_all():
@@ -467,22 +612,30 @@ def main():
         return
 
     # --- ループ監視モード（短い間隔で見張り続ける）---
-    print(f"ループ監視開始: {POLL_SECONDS}秒ごと / 最長 {LOOP_MINUTES}分")
+    # ②ブランド(利益が出る時だけ通知)は SLOW_SECONDS ごとにだけチェックする。
+    # こうすると①の優先ブランド(サンローラン等)の見張りが遅くならない。
+    SLOW_SECONDS = int(os.environ.get("SLOW_SECONDS", "300"))  # ②は何秒ごとに見るか
+    print(f"ループ監視開始: {POLL_SECONDS}秒ごと / ②ブランドは{SLOW_SECONDS}秒ごと / 最長 {LOOP_MINUTES}分")
     end_time = time.time() + LOOP_MINUTES * 60
 
-    # まず最初の1回チェック
-    new_items = one_pass(kindal_first, trefac_first, bring_first, rinkan_first, hardoff_first)
+    # まず最初の1回チェック（②ブランドも含めて全部見て記録する）
+    new_items = one_pass(kindal_first, trefac_first, bring_first, rinkan_first, hardoff_first, do_slow=True)
     if kindal_first or trefac_first or bring_first or rinkan_first or hardoff_first:
         start_message()
     if new_items:
         send_items(new_items)
     save_all()
     git_save_state()  # 記録をすぐサーバーに保存（重複通知を防ぐ）
+    last_slow = time.time()  # ②ブランドを最後に見た時刻
 
     # 決めた時間内は、くり返しチェックし続ける（2回目以降は初回扱いしない）
     while time.time() < end_time:
         time.sleep(POLL_SECONDS)
-        items = one_pass(False, False, False, False, False)
+        # ②ブランドを見るタイミングか判定（SLOW_SECONDS 経過したら見る）
+        do_slow = (time.time() - last_slow) >= SLOW_SECONDS
+        if do_slow:
+            last_slow = time.time()
+        items = one_pass(False, False, False, False, False, do_slow=do_slow)
         if items:
             print(f"新着 {len(items)} 件 → 通知")
             send_items(items)
