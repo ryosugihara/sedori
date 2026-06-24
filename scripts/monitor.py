@@ -55,6 +55,12 @@ REQUEST_WAIT = 1.5                    # サイトへの優しさ（アクセス�
 POLL_SECONDS = int(os.environ.get("POLL_SECONDS", "30"))  # 何秒ごとにチェックするか
 LOOP_MINUTES = int(os.environ.get("LOOP_MINUTES", "27"))  # 1回の見張りを何分続けるか
 
+# ②ブランド(profit_only)の自動通知スイッチ。
+# 文字だけの判定だと『デザインが違うのに同じ商品』と誤通知してしまうため、
+# 画像でデザイン一致を確認できる仕組みができるまでは 0（止める）にしておく。
+# ①ブランド(サンローラン・Undercoverデニム)は今まで通り通知される。
+NOTIFY_PROFIT_ONLY = os.environ.get("NOTIFY_PROFIT_ONLY", "0") == "1"
+
 # 本物のブラウザのふりをするための情報
 HEADERS = {
     "User-Agent": (
@@ -553,7 +559,11 @@ def check_source(brands, seen, first_run, get_items, do_slow=True):
     excludes = load_excludes()  # 通知しない条件を読み込む
     souba = load_souba()        # 利益予測の設定(手数料・送料・通知ライン)
     for b in brands:
-        # ②ブランド(利益が出る時だけ通知)は、ゆっくり巡回の時だけチェックする
+        # ②ブランド(profit_only)は、画像でのデザイン判定ができるまで自動通知を止める。
+        # （文字だけだと別デザインを誤通知してしまうため。①ブランドは影響なし）
+        if b.get("profit_only") and not NOTIFY_PROFIT_ONLY:
+            continue
+        # ②ブランドを通知する設定の時は、ゆっくり巡回の時だけチェックする
         if b.get("profit_only") and not do_slow:
             continue
         # 識別子：KINDALは collection、トレファクは keyword を使う
