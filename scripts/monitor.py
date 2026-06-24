@@ -283,32 +283,89 @@ def categorize(text):
     return None
 
 
+# 「特徴にならない一般的な言葉」。これらは“同じ商品”の手がかりにしない。
+# （例:「Tシャツ」「デニム」「graphic」だけ一致しても同じ商品とは言えない）
+WEAK_TOKENS = {
+    # 英語・ローマ字の一般語（種類・素材・形・状態など）
+    "graphic", "message", "jeans", "denim", "leather", "hoodie", "jacket",
+    "pants", "shirt", "knit", "sweater", "down", "riders", "polo", "mini",
+    "bag", "tee", "tshirt", "band", "belt", "scarf", "beanie", "longsleeve",
+    "bracelet", "wristband", "chain", "jean", "size", "made",
+    "wool", "cotton", "nylon", "rayon", "mohair", "military", "vintage",
+    "shoulder", "tote", "body", "zip", "zipper", "studs", "stud",
+    # 日本語の一般語
+    "デニム", "ジャケット", "パーカー", "シャツ", "ニット", "セーター",
+    "パンツ", "バッグ", "ジーンズ", "スキニー", "ブレスレット", "ベルト",
+    "スカーフ", "ダウン", "ライダース", "ニット帽", "フーディー",
+    "グラフィック", "レザー", "ショルダー", "トート", "ハンド", "ボディ",
+    "ウール", "コットン", "ナイロン", "レーヨン", "モヘア", "ミリタリー",
+    "ストール", "マフラー", "ヴィンテージ", "ビンテージ",
+}
+
+
+def signature_tokens(record):
+    """1つの売却実例から『その商品ならではの特徴語(=指紋)』を取り出す。
+    keywords(英語) と model(型番名) から、一般語・種類の言葉を除いた手がかりだけを集める。
+    例: AW07 翼 Tシャツ → {'tsubasa','wing'} / SS06 KILL YOUR IDOLS → {'kill','idols',...}
+    """
+    def is_generic(tok):
+        # 一般語、または種類を表すだけの言葉(Tシャツ/デニム等)は手がかりにしない
+        return tok in WEAK_TOKENS or categorize(tok) is not None
+
+    toks = set()
+    # keywords（curているローマ字の特徴語）
+    for k in record.get("keywords", []):
+        k = (k or "").strip().lower()
+        if len(k) >= 4 and not is_generic(k):
+            toks.add(k)
+    # model（型番名）を空白で区切って1語ずつ見る
+    for chunk in re.split(r"\s+", record.get("model", "")):
+        c = chunk.strip().lower()
+        if not c or is_generic(c):
+            continue
+        # 数字を含む語(季節記号ss2002・年代1990s・サイズ等)は手がかりにしない
+        if any(ch.isdigit() for ch in c):
+            continue
+        if re.fullmatch(r"[a-z][a-z\-]*", c):
+            if len(c) >= 4:          # 英単語は4文字以上だけ
+                toks.add(c)
+        elif len(c) >= 2:            # 日本語の語は2文字以上
+            toks.add(c)
+    return toks
+
+
 def predict_profit(item, souba):
     """売却済みDBと照らして『予想相場・予想利益』を計算する。
-    同じブランド かつ 同じ種類 の売却実例が無ければ None（予測できない）。
+    送ってもらった写真と“同じ商品”と判断できた時だけ予測する。
+    （同じブランドで、その商品ならではの特徴語が題名に入っていること）
+    判断できなければ None を返す（＝通知しない／意味のない予測はしない）。
     """
     buy = item.get("price_num")
     if not buy:
         return None  # 仕入値が分からなければ予測しない
 
     bn = norm_brand(item.get("brand", ""))
-    cat = categorize((item.get("title", "") + " " + item.get("category", "")))
-    if not cat:
-        return None  # 種類が判定できなければ予測しない
+    title = (item.get("title", "") + " " + item.get("category", "")).lower()
 
     db = load_sold_db()
-    # 同じブランド・同じ種類で売れた実例だけを集める
-    matched = [
-        r for r in db
-        if norm_brand(r.get("brand", "")) == bn
-        and categorize(r.get("item_type", "")) == cat
-    ]
-    if not matched:
-        return None
+    # 同じブランドの実例ごとに「特徴語が題名にいくつ入っているか」を数える
+    scored = []
+    for r in db:
+        if norm_brand(r.get("brand", "")) != bn:
+            continue
+        toks = signature_tokens(r)
+        hits = [t for t in toks if t in title]
+        if hits:
+            scored.append((len(hits), r))
+    if not scored:
+        return None  # 同じ商品が見つからない＝予測しない
 
-    # 売れた値段の「真ん中の値(中央値)」を予想相場とする（極端な値に振られにくい）
-    prices = sorted(r.get("sold_price", 0) for r in matched)
-    sell = prices[len(prices) // 2]
+    # 一番多く特徴語が一致した実例（＝同じ商品の可能性が高い）に絞る
+    best = max(n for n, _ in scored)
+    same = [r for n, r in scored if n == best]
+    prices = sorted(r.get("sold_price", 0) for r in same)
+    sell = prices[len(prices) // 2]            # 中央値（極端な値に振られにくい）
+    rep = same[0]                              # 代表（どの商品と判定したか表示用）
 
     fee, ship = souba["fee"], souba["shipping"]
     net = int(sell * (1 - fee) - ship)  # メルカリ手取り
@@ -317,8 +374,9 @@ def predict_profit(item, souba):
         "sell": sell,
         "net": net,
         "profit": profit,
-        "count": len(matched),
-        "cat": cat,
+        "count": len(same),
+        "model": rep.get("model", ""),     # 同型と判定した商品名
+        "brand": rep.get("brand", ""),
     }
 
 
@@ -335,7 +393,7 @@ def prediction_lines(item, souba):
     else:
         mark = "🔴 低"
     return (
-        f"🎯 予想相場 ¥{pred['sell']:,}（{pred['cat']} / 実例{pred['count']}件）\n"
+        f"🎯 同型と判定: {pred['model']}（売却実例 ¥{pred['sell']:,} / {pred['count']}件）\n"
         f"💰 予想利益 約¥{profit:,}（利益見込み: {mark}）"
     )
 
