@@ -1,3 +1,8 @@
-KINDAL 接続テスト  実行時刻: 2026-06-22 14:49:42
+メルカリ 相場取得テスト  実行時刻: 2026-06-25 10:05:54
 
-[1] https://www.okoku.jp/ec/Facet?inputKeywordFacet=SAINT%20LAURENT  ->  status=200, final=https://www.okoku.jp/ec/Facet?inputKeywordFacet=SAINT%20LAURENT, size=213380 bytes
+[1] status=200 size=549,067B 🟢 商品データあり
+    NEXT_DATA=False itemName=16 price=0 商品ID=0
+[2] status=200 size=549,067B 🟢 商品データあり
+    NEXT_DATA=False itemName=16 price=0 商品ID=0
+[3] status=200 size=547,317B 🟢 商品データあり
+    NEXT_DATA=False itemName=16 price=0 商品ID=0
