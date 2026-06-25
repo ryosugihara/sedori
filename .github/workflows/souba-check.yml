@@ -1,0 +1,35 @@
+# メルカリ相場チェック（手動）
+# 「ブランド 商品 色 サイズ」を入力すると、その売り切れ相場(中央値)をDiscordに送る。
+name: メルカリ相場チェック
+
+on:
+  workflow_dispatch:
+    inputs:
+      keyword:
+        description: "調べたい言葉（例: サンローラン スキニー 黒 S）。複数行で一度に複数も可"
+        required: true
+        default: "サンローラン スキニー 黒 S"
+
+permissions:
+  contents: read
+
+jobs:
+  souba:
+    runs-on: ubuntu-latest
+    steps:
+      - name: リポジトリを取得
+        uses: actions/checkout@v4
+
+      - name: Pythonを準備
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 必要ライブラリを入れる
+        run: pip install pyjwt cryptography
+
+      - name: 相場チェックを実行
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          KEYWORD: ${{ github.event.inputs.keyword }}
+        run: python scripts/mercari.py
