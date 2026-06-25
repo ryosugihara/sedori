@@ -1,0 +1,45 @@
+# メルカリ 相場 自動取得テスト（実験）
+# DPoP署名を付けてメルカリの検索APIから相場が取れるか試す。手動＋push時に実行。
+name: メルカリ相場テスト
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - claude/adoring-bell-7rqznj
+    paths:
+      - "scripts/mercari_test.py"
+      - ".github/workflows/mercari-test.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  mercari-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: リポジトリを取得
+        uses: actions/checkout@v4
+
+      - name: Pythonを準備
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 必要ライブラリを入れる
+        run: pip install pyjwt cryptography
+
+      - name: メルカリ相場テストを実行
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: python scripts/mercari_test.py
+
+      - name: 結果を保存
+        if: always()
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add recon
+          git commit -m "メルカリ相場テスト結果を保存" || echo "変更なし"
+          git pull --rebase origin ${{ github.ref_name }} || true
+          git push || echo "push スキップ"
