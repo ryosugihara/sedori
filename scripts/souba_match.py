@@ -145,6 +145,7 @@ def match_item(item, souba):
             "ref_name": (r0[1] or "")[:40],
             "ref_price": r0[2],
             "ref_url": f"https://jp.mercari.com/item/{r0[0]}",
+            "ref_image": r0[5],  # 実例の写真URL（通知で店の写真と並べて見せる）
         }
     except Exception as e:
         print(f"  画像照合エラー: {e}")

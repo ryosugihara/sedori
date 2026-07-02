@@ -473,7 +473,10 @@ def profit_lines(item, souba):
         lines.append(f"🎯 予想相場 ¥{m['estimate']:,} → 手取り ¥{m['net']:,}")
         if m["profit"] is not None:
             lines.append(f"💰 予想利益 約¥{m['profit']:,}")
-        lines.append(f"　根拠: [{m['ref_name']}]({m['ref_url']}) ¥{m['ref_price']:,}")
+        lines.append(
+            f"⬇️ 下の大きい写真＝メルカリで売れた実例 ¥{m['ref_price']:,}\n"
+            f"　[{m['ref_name']}]({m['ref_url']})"
+        )
 
     # 3) 相場メモに一致したら、利益見込み(高/中/低)を出す
     rec = match_souba(item, souba["records"])
@@ -518,7 +521,12 @@ def send_items(items):
                 ),
             }
             if it.get("image"):
+                # 右上の小さい写真 ＝ お店の商品
                 embed["thumbnail"] = {"url": it["image"]}
+            m = it.get("img_match")
+            if m and m.get("ref_image"):
+                # 下の大きい写真 ＝ メルカリで売れた実例（見比べ用）
+                embed["image"] = {"url": m["ref_image"]}
             embeds.append(embed)
         discord_post({"content": f"🆕 新着 {len(chunk)} 件", "embeds": embeds})
         print(f"  Discordに {len(chunk)} 件通知しました")
