@@ -59,8 +59,7 @@ def pct(sorted_list, p):
 
 def main():
     random.seed(7)  # 毎回同じ選び方になるように（結果を再現できる）
-    pos_c, pos_d = [], []  # 同じ商品ペアの点数 (CLIP, DINO)
-    neg_c, neg_d = [], []  # 違う商品ペアの点数
+    pos_pairs, neg_pairs = [], []  # (CLIP点, DINO点) のペアたち
 
     for kw in KEYWORDS:
         items = mercari.fetch_sold(kw)
@@ -82,27 +81,33 @@ def main():
                 a = fetch_raw(photos[0])
                 b = fetch_raw(photos[1])
                 c, d = sims(a, b)
-                pos_c.append(c); pos_d.append(d)
+                pos_pairs.append((c, d))
                 used.append((it, a))  # 1枚目は違う商品ペアにも再利用する
                 print(f"  同商品ペア {len(used)}組目 CLIP={c:.3f} DINO={d:.3f}")
             except Exception as e:
                 print(f"  スキップ: {e}")
 
-        # --- 違う商品ペア（別々の商品の1枚目どうし）---
-        for i in range(len(used) - 1):
-            try:
-                c, d = sims(used[i][1], used[i + 1][1])
-                neg_c.append(c); neg_d.append(d)
-            except Exception as e:
-                print(f"  スキップ: {e}")
+        # --- 違う商品ペア（別々の商品の1枚目どうし・全組み合わせ）---
+        for i in range(len(used)):
+            for j in range(i + 1, len(used)):
+                try:
+                    c, d = sims(used[i][1], used[j][1])
+                    neg_pairs.append((c, d))
+                except Exception as e:
+                    print(f"  スキップ: {e}")
 
-    pos_c.sort(); pos_d.sort(); neg_c.sort(); neg_d.sort()
-    if not pos_c or not neg_c:
-        lines = [f"測定できず: 同じ商品ペア {len(pos_c)}組 / 違う商品ペア {len(neg_c)}組",
-                 "（商品詳細から写真一覧が取れなかった可能性）"]
+    import json as _json
+    os.makedirs("recon", exist_ok=True)
+    with open("recon/CALIB_RAW.json", "w", encoding="utf-8") as f:
+        _json.dump({"pos": pos_pairs, "neg": neg_pairs}, f)
+
+    if not pos_pairs or not neg_pairs:
+        lines = [f"測定できず: 同じ商品ペア {len(pos_pairs)}組 / 違う商品ペア {len(neg_pairs)}組"]
     else:
+        pos_c = sorted(c for c, _ in pos_pairs); pos_d = sorted(d for _, d in pos_pairs)
+        neg_c = sorted(c for c, _ in neg_pairs); neg_d = sorted(d for _, d in neg_pairs)
         lines = [
-            f"精度測定の結果  同じ商品ペア {len(pos_c)}組 / 違う商品ペア {len(neg_c)}組",
+            f"精度測定の結果  同じ商品ペア {len(pos_pairs)}組 / 違う商品ペア {len(neg_pairs)}組",
             "",
             "【CLIP】",
             f"  同じ商品:  低い方5% {pct(pos_c,5):.3f} / 25% {pct(pos_c,25):.3f} / 中央 {pct(pos_c,50):.3f}",
@@ -112,8 +117,14 @@ def main():
             f"  同じ商品:  低い方5% {pct(pos_d,5):.3f} / 25% {pct(pos_d,25):.3f} / 中央 {pct(pos_d,50):.3f}",
             f"  違う商品:  中央 {pct(neg_d,50):.3f} / 95% {pct(neg_d,95):.3f} / 最高 {neg_d[-1]:.3f}",
             "",
-            "→『違う商品の95%/最高』より上に『同じ商品の大半』が来るAIほど使える。",
+            "【合わせ技（CLIP≧c かつ DINO≧d を合格とした場合）】",
+            "  合格ライン        同じ商品を拾える率   違う商品を誤って拾う率",
         ]
+        for ct, dt in [(0.85, 0.75), (0.88, 0.80), (0.90, 0.85), (0.92, 0.88),
+                       (0.93, 0.90), (0.95, 0.92)]:
+            tp = sum(1 for c, d in pos_pairs if c >= ct and d >= dt) / len(pos_pairs)
+            fp = sum(1 for c, d in neg_pairs if c >= ct and d >= dt) / len(neg_pairs)
+            lines.append(f"  CLIP{ct:.2f}/DINO{dt:.2f}   {tp*100:5.1f}%            {fp*100:5.2f}%")
     report = "\n".join(lines)
     os.makedirs("recon", exist_ok=True)
     with open(REPORT, "w", encoding="utf-8") as f:
