@@ -236,8 +236,11 @@ def load_souba():
         "high": s.get("利益見込み_高ライン_円", 20000),
         "mid": s.get("利益見込み_中ライン_円", 3000),
         "notify_line": s.get("利益通知ライン_円", 2000),  # ②ブランドはこの利益以上だけ通知
-        "strong_th": s.get("画像一致_同デザイン", 0.92),   # 画像がこの近さなら「同デザイン」
-        "cand_th": s.get("画像一致_似た系統", 0.86),       # この近さなら「似た系統」(参考)
+        # 画像判定の合格ライン（精度測定で決めた値：違う商品の誤合格0%のライン）
+        "strong_th": s.get("画像一致_同デザイン", 0.92),        # 同デザイン: CLIP
+        "strong_dino": s.get("画像一致_同デザイン_DINO", 0.90),  # 同デザイン: DINO
+        "cand_th": s.get("画像一致_似た系統", 0.88),            # 似た系統: CLIP
+        "cand_dino": s.get("画像一致_似た系統_DINO", 0.80),      # 似た系統: DINO
         "records": data.get("records", []),
     }
 
@@ -468,7 +471,7 @@ def profit_lines(item, souba):
         mark = "🟢" if m["rank"] == "同デザイン" else "🟡"
         lines.append(
             f"🖼️ {mark} {m['rank']}の売却実例あり"
-            f"（類似度{m['best_sim']:.2f}・{m['count']}件）"
+            f"（同一度{m['best_sim']:.2f}/系統{m.get('clip_sim', 0):.2f}・{m['count']}件）"
         )
         lines.append(f"🎯 予想相場 ¥{m['estimate']:,} → 手取り ¥{m['net']:,}")
         if m["profit"] is not None:

@@ -53,10 +53,13 @@ def open_db():
             updated INTEGER           -- いつの取引か(相場の鮮度チェックに使う)
         )
     """)
-    # 昔に作ったDBに updated 列が無ければ足す（引っ越し処理）
+    # 昔に作ったDBに無い列があれば足す（引っ越し処理）
     cols = [r[1] for r in con.execute("PRAGMA table_info(items)")]
     if "updated" not in cols:
         con.execute("ALTER TABLE items ADD COLUMN updated INTEGER")
+    if "vec2" not in cols:
+        # vec2 = DINOv2の指紋（同一商品の見分け用・CLIPとの二重チェック）
+        con.execute("ALTER TABLE items ADD COLUMN vec2 BLOB")
     return con
 
 
@@ -130,22 +133,25 @@ def main():
             print(f"  「{kw}」 取得{len(items)}件 / 新規{len(fresh)}件")
 
             for it in fresh:
-                vec = None
+                vec, vec2 = None, None
                 if it.get("image"):
-                    v = fingerprint.embed_image_url(it["image"])
+                    # 1回のダウンロードで2種類の指紋(CLIP+DINO)を作る
+                    v, v2 = fingerprint.embed_image_url_both(it["image"])
                     if v is not None:
                         # float16にして半分のサイズで保存（精度はほぼ変わらない）
                         vec = v.astype("float16").tobytes()
+                    if v2 is not None:
+                        vec2 = v2.astype("float16").tobytes()
                     time.sleep(IMG_WAIT)
                 if vec is None:
                     no_image += 1
                 con.execute(
                     "INSERT OR IGNORE INTO items "
                     "(id, name, price, brand, size, condition_id, image_url, "
-                    " keyword, added, vec, updated) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                    " keyword, added, vec, updated, vec2) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
                     (it["id"], it["name"], it["price"], b["name"], it["size"],
                      it.get("condition_id"), it.get("image"), kw, now, vec,
-                     it.get("updated")),
+                     it.get("updated"), vec2),
                 )
                 known.add(it["id"])
                 added += 1
@@ -157,6 +163,30 @@ def main():
     con.execute("UPDATE items SET updated = CAST(strftime('%s', added) AS INTEGER) "
                 "WHERE updated IS NULL AND added IS NOT NULL")
     con.commit()
+
+    # 昔に集めた行でDINO指紋(vec2)が無い物は、写真を取り直して埋める（引っ越し処理）
+    todo = con.execute(
+        "SELECT id, image_url FROM items "
+        "WHERE vec2 IS NULL AND image_url IS NOT NULL AND image_url != ''"
+    ).fetchall()
+    if todo:
+        print(f"DINO指紋の埋め直し: {len(todo)} 件")
+        done = 0
+        for i, (iid, url) in enumerate(todo, start=1):
+            try:
+                _, v2 = fingerprint.embed_image_url_both(url)
+                if v2 is not None:
+                    con.execute("UPDATE items SET vec2=? WHERE id=?",
+                                (v2.astype("float16").tobytes(), iid))
+                    done += 1
+            except Exception as e:
+                print(f"  埋め直し失敗 ({iid}): {e}")
+            if i % 200 == 0:
+                con.commit()
+                print(f"  進捗 {i}/{len(todo)}（成功 {done}）")
+            time.sleep(IMG_WAIT)
+        con.commit()
+        print(f"DINO指紋の埋め直し完了: {done}/{len(todo)} 件")
 
     total = con.execute("SELECT COUNT(*) FROM items").fetchone()[0]
     with_vec = con.execute("SELECT COUNT(*) FROM items WHERE vec IS NOT NULL").fetchone()[0]

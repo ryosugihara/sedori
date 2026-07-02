@@ -60,35 +60,37 @@ def _load():
     _cache["loaded"] = True
     import numpy as np
     con = sqlite3.connect(DB_FILE)
-    # 相場は変動するので、新しい取引（既定：半年以内）だけを参照する
+    # 相場は変動するので、新しい取引（既定：半年以内）だけを参照する。
+    # 指紋は CLIP と DINO の両方が揃っている行だけ使う（二重チェックのため）。
     cutoff = int(time.time()) - _souba_days() * 86400
     cols = [r[1] for r in con.execute("PRAGMA table_info(items)")]
-    if "updated" in cols:
-        rows = con.execute(
-            "SELECT id, name, price, brand, size, image_url, vec "
-            "FROM items WHERE vec IS NOT NULL "
-            "AND (updated IS NULL OR updated >= ?)", (cutoff,)
-        ).fetchall()
-    else:  # 古い形のDBでも動くように
-        rows = con.execute(
-            "SELECT id, name, price, brand, size, image_url, vec "
-            "FROM items WHERE vec IS NOT NULL"
-        ).fetchall()
+    if "vec2" not in cols:
+        con.close()
+        print("  相場DBにDINO指紋がまだ無いため、画像照合は休止します")
+        return
+    rows = con.execute(
+        "SELECT id, name, price, brand, size, image_url, vec, vec2 "
+        "FROM items WHERE vec IS NOT NULL AND vec2 IS NOT NULL "
+        "AND (updated IS NULL OR updated >= ?)", (cutoff,)
+    ).fetchall()
     con.close()
+
+    def to_mat(blobs):
+        mat = np.stack([np.frombuffer(b, dtype=np.float16).astype("float32")
+                        for b in blobs])
+        # 念のため長さを1にそろえる（近さ計算を正確にするため）
+        norms = np.linalg.norm(mat, axis=1, keepdims=True)
+        norms[norms == 0] = 1
+        return mat / norms
 
     groups = {}
     for r in rows:
         groups.setdefault(_norm_brand(r[3]), []).append(r)
     for bn, rs in groups.items():
-        mat = np.stack([
-            np.frombuffer(r[6], dtype=np.float16).astype("float32") for r in rs
-        ])
-        # 念のため長さを1にそろえる（近さ計算を正確にするため）
-        norms = np.linalg.norm(mat, axis=1, keepdims=True)
-        norms[norms == 0] = 1
-        mat = mat / norms
-        _cache["brands"][bn] = (mat, rs)
-    total = sum(len(rs) for _, rs in _cache["brands"].values())
+        mat_c = to_mat([r[6] for r in rs])  # CLIPの指紋たち
+        mat_d = to_mat([r[7] for r in rs])  # DINOの指紋たち
+        _cache["brands"][bn] = (mat_c, mat_d, rs)
+    total = sum(len(g[2]) for g in _cache["brands"].values())
     print(f"  相場DB読み込み: {total}件 / {len(_cache['brands'])}ブランド")
 
 
@@ -108,22 +110,33 @@ def match_item(item, souba):
 
         import numpy as np
         import fingerprint
-        vec = fingerprint.embed_image_url(item["image"])
-        if vec is None:
+        # 1回のダウンロードで、CLIPとDINOの2種類の指紋を作る
+        vec_c, vec_d = fingerprint.embed_image_url_both(item["image"])
+        if vec_c is None or vec_d is None:
             return None
 
-        mat, rs = got
-        sims = mat @ vec  # 全実例との近さを一気に計算
+        mat_c, mat_d, rs = got
+        sims_c = mat_c @ vec_c  # CLIP（見た目の系統）の近さ
+        sims_d = mat_d @ vec_d  # DINO（同一商品か）の近さ
 
-        strong = souba.get("strong_th", 0.92)  # 「同デザイン」のライン
-        cand = souba.get("cand_th", 0.86)      # 「似た系統」のライン
-        order = np.argsort(-sims)
-        picked = [i for i in order if sims[i] >= cand][:5]  # 近い順に最大5件
-        if not picked:
+        # 合格ライン（精度測定で決めた値。souba.jsonで調整できる）
+        strong_c = souba.get("strong_th", 0.92)    # 同デザイン: CLIP
+        strong_d = souba.get("strong_dino", 0.90)  # 同デザイン: DINO
+        cand_c = souba.get("cand_th", 0.88)        # 似た系統: CLIP
+        cand_d = souba.get("cand_dino", 0.80)      # 似た系統: DINO
+
+        # 両方のAIが「似ている」と言った実例だけを候補にする（二重チェック）
+        ok = (sims_c >= cand_c) & (sims_d >= cand_d)
+        idx = np.where(ok)[0]
+        if len(idx) == 0:
             return None
+        # 同一商品の判定が得意なDINOの点数が高い順に、最大5件
+        picked = list(idx[np.argsort(-sims_d[idx])][:5])
 
-        best = float(sims[picked[0]])
-        rank = "同デザイン" if best >= strong else "似た系統"
+        i0 = picked[0]
+        best_c, best_d = float(sims_c[i0]), float(sims_d[i0])
+        rank = ("同デザイン" if (best_c >= strong_c and best_d >= strong_d)
+                else "似た系統")
 
         # 近い実例たちの「真ん中の値段」を予想相場にする（外れ値に強い）
         prices = [rs[i][2] for i in picked]
@@ -134,10 +147,11 @@ def match_item(item, souba):
         buy = item.get("price_num")
         profit = (net - buy) if buy else None   # 予想利益（仕入値不明なら None）
 
-        r0 = rs[picked[0]]  # 一番似ていた実例（通知で根拠として見せる）
+        r0 = rs[i0]  # 一番似ていた実例（通知で根拠として見せる）
         return {
             "rank": rank,
-            "best_sim": best,
+            "best_sim": best_d,   # 同一商品らしさ(DINO)
+            "clip_sim": best_c,   # 見た目の系統の近さ(CLIP)
             "estimate": estimate,
             "net": net,
             "profit": profit,
