@@ -122,6 +122,7 @@ def fetch_sold(keyword, page_size=120):
             "brand": brand,
             "size": size,
             "image": thumbs[0] if thumbs else "",          # 商品写真(サムネイル)のURL
+            "thumbnails": thumbs,                           # 写真の一覧（精度測定に使う）
             "condition_id": it.get("itemConditionId"),      # 状態ランク(1=新品寄り〜6)
             # いつの取引か（updated=最終更新。売れた頃の時刻として使う）
             "updated": _to_int(it.get("updated")) or _to_int(it.get("created")),
