@@ -102,11 +102,30 @@ def match_item(item, souba):
     try:
         if not item.get("image"):
             return None  # 写真が無い商品は画像では判定できない
+
+        text = (item.get("title", "") + " " + item.get("category", "")).lower()
+
+        # 無地(特徴がない)デニム・パンツ等は、写真では同じ商品か見分けられない
+        # （着丈やシルエットの違いが写真に出にくい）ため、画像判定しない。
+        plain = any(k.lower() in text for k in souba.get("plain_cats", []))
+        has_feature = any(w.lower() in text for w in souba.get("feature_words", []))
+        if plain and not has_feature:
+            return None
+
         _load()
         bn = _norm_brand(item.get("brand", ""))
         got = _cache["brands"].get(bn)
         if not got:
             return None  # このブランドの売却実例がまだDBに無い
+
+        # 属性キーワード（例:コーティング）は『商品名に書いてあるか』が
+        # 新着と実例で一致しないと照合しない。
+        # ※コーティングデニムは写真だと普通の黒デニムとそっくりだが相場が別物のため。
+        attr_words = [w.lower() for w in souba.get("attr_words", [])]
+
+        def attrs_ok(ref_name):
+            rn = (ref_name or "").lower()
+            return all((w in text) == (w in rn) for w in attr_words)
 
         import numpy as np
         import fingerprint
@@ -128,9 +147,12 @@ def match_item(item, souba):
         # 両方のAIが「似ている」と言った実例だけを候補にする（二重チェック）
         ok = (sims_c >= cand_c) & (sims_d >= cand_d)
         idx = np.where(ok)[0]
+        # さらに属性キーワード（コーティング等）の食い違う実例を外す
+        idx = [i for i in idx if attrs_ok(rs[i][1])]
         if len(idx) == 0:
             return None
         # 同一商品の判定が得意なDINOの点数が高い順に、最大5件
+        idx = np.array(idx)
         picked = list(idx[np.argsort(-sims_d[idx])][:5])
 
         i0 = picked[0]

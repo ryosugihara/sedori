@@ -241,6 +241,10 @@ def load_souba():
         "strong_dino": s.get("画像一致_同デザイン_DINO", 0.90),  # 同デザイン: DINO
         "cand_th": s.get("画像一致_似た系統", 0.88),            # 似た系統: CLIP
         "cand_dino": s.get("画像一致_似た系統_DINO", 0.80),      # 似た系統: DINO
+        # 画像判定の対象外・照合条件（無地は判定しない／属性語は名前の一致が必要）
+        "plain_cats": s.get("画像判定_無地カテゴリ", []),
+        "feature_words": s.get("画像判定_特徴語", []),
+        "attr_words": s.get("画像判定_属性キーワード", []),
         "records": data.get("records", []),
     }
 
