@@ -31,7 +31,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/huggingface
-          key: clip-vit-b-32
+          key: clip-and-dinov2
 
       - name: 必要な道具を入れる
         run: |
