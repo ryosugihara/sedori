@@ -99,12 +99,15 @@ def fetch_sold(keyword, page_size=120):
             continue
         brand = (it.get("itemBrand") or {}).get("name", "") or ""
         size = (it.get("itemSize") or {}).get("name", "") if isinstance(it.get("itemSize"), dict) else ""
+        thumbs = it.get("thumbnails") or []
         out.append({
             "id": it.get("id", ""),
             "name": it.get("name", ""),
             "price": price,
             "brand": brand,
             "size": size,
+            "image": thumbs[0] if thumbs else "",          # 商品写真(サムネイル)のURL
+            "condition_id": it.get("itemConditionId"),      # 状態ランク(1=新品寄り〜6)
         })
     return out
 

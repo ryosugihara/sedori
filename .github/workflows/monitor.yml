@@ -33,6 +33,18 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: AIモデルの置き場をキャッシュ（2回目から速くなる）
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: clip-vit-b-32
+
+      # 画像判定AI(CLIP)の道具。入らなくても監視自体は止めない（②だけ休む）
+      - name: 画像判定AIを準備（失敗しても監視は続行）
+        run: |
+          pip install --quiet torch --index-url https://download.pytorch.org/whl/cpu || true
+          pip install --quiet sentence-transformers pillow || true
+
       - name: 新着監視（ループ）を実行
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}

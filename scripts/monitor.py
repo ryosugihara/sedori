@@ -26,6 +26,13 @@ import trefac  # トレファク用の読み取り部品（同じフォルダの
 import rinkan  # RINKAN用の読み取り部品（同じフォルダの rinkan.py）
 import hardoff  # おふもーる(ハードオフ)用の読み取り部品（同じフォルダの hardoff.py）
 
+# 画像照合（メルカリ相場DBと写真を見比べる部品）。
+# AIの道具が入っていない環境でも監視が止まらないよう、失敗したら無しで動く。
+try:
+    import souba_match
+except Exception:
+    souba_match = None
+
 # --- 設定（ここの数字や名前を変えれば動きを調整できます）-------------------
 SHOP = "https://shop.kind.co.jp"      # KINDAL 通販サイトのアドレス
 BRANDS_FILE = "watch_brands.json"     # KINDAL の見張るブランド一覧
@@ -55,11 +62,12 @@ REQUEST_WAIT = 1.5                    # サイトへの優しさ（アクセス�
 POLL_SECONDS = int(os.environ.get("POLL_SECONDS", "30"))  # 何秒ごとにチェックするか
 LOOP_MINUTES = int(os.environ.get("LOOP_MINUTES", "27"))  # 1回の見張りを何分続けるか
 
-# ②ブランド(profit_only)の自動通知スイッチ。
-# 文字だけの判定だと『デザインが違うのに同じ商品』と誤通知してしまうため、
-# 画像でデザイン一致を確認できる仕組みができるまでは 0（止める）にしておく。
-# ①ブランド(サンローラン・Undercoverデニム)は今まで通り通知される。
-NOTIFY_PROFIT_ONLY = os.environ.get("NOTIFY_PROFIT_ONLY", "0") == "1"
+def image_match_ready():
+    """②ブランドの画像判定が使える状態か。
+    相場DB(souba_db.sqlite)とAIの道具が揃っている時だけ True。
+    揃っていなければ②は通知せずスキップ（①は影響なし）。
+    """
+    return souba_match is not None and souba_match.ready()
 
 # 本物のブラウザのふりをするための情報
 HEADERS = {
@@ -228,6 +236,8 @@ def load_souba():
         "high": s.get("利益見込み_高ライン_円", 20000),
         "mid": s.get("利益見込み_中ライン_円", 3000),
         "notify_line": s.get("利益通知ライン_円", 2000),  # ②ブランドはこの利益以上だけ通知
+        "strong_th": s.get("画像一致_同デザイン", 0.92),   # 画像がこの近さなら「同デザイン」
+        "cand_th": s.get("画像一致_似た系統", 0.86),       # この近さなら「似た系統」(参考)
         "records": data.get("records", []),
     }
 
@@ -452,10 +462,18 @@ def profit_lines(item, souba):
             f"（手数料{int(fee * 100)}%+送料¥{ship}想定）"
         )
 
-    # 2) 売却済みDBの予測(予想相場・予想利益)があれば出す（Phase 2）
-    pred_text = prediction_lines(item, souba)
-    if pred_text:
-        lines.append(pred_text)
+    # 2) 画像照合の結果（メルカリ相場DBの写真と見比べた判定）があれば出す
+    m = item.get("img_match")
+    if m:
+        mark = "🟢" if m["rank"] == "同デザイン" else "🟡"
+        lines.append(
+            f"🖼️ {mark} {m['rank']}の売却実例あり"
+            f"（類似度{m['best_sim']:.2f}・{m['count']}件）"
+        )
+        lines.append(f"🎯 予想相場 ¥{m['estimate']:,} → 手取り ¥{m['net']:,}")
+        if m["profit"] is not None:
+            lines.append(f"💰 予想利益 約¥{m['profit']:,}")
+        lines.append(f"　根拠: [{m['ref_name']}]({m['ref_url']}) ¥{m['ref_price']:,}")
 
     # 3) 相場メモに一致したら、利益見込み(高/中/低)を出す
     rec = match_souba(item, souba["records"])
@@ -559,11 +577,11 @@ def check_source(brands, seen, first_run, get_items, do_slow=True):
     excludes = load_excludes()  # 通知しない条件を読み込む
     souba = load_souba()        # 利益予測の設定(手数料・送料・通知ライン)
     for b in brands:
-        # ②ブランド(profit_only)は、画像でのデザイン判定ができるまで自動通知を止める。
+        # ②ブランド(profit_only)は、画像判定の準備(相場DB+AI)が無い時はスキップ。
         # （文字だけだと別デザインを誤通知してしまうため。①ブランドは影響なし）
-        if b.get("profit_only") and not NOTIFY_PROFIT_ONLY:
+        if b.get("profit_only") and not image_match_ready():
             continue
-        # ②ブランドを通知する設定の時は、ゆっくり巡回の時だけチェックする
+        # ②ブランドは、ゆっくり巡回の時だけチェックする（①の速度を守るため）
         if b.get("profit_only") and not do_slow:
             continue
         # 識別子：KINDALは collection、トレファクは keyword を使う
@@ -595,13 +613,19 @@ def check_source(brands, seen, first_run, get_items, do_slow=True):
                     continue
                 if not matches_only(it, only_kw):
                     continue
-                # 売却済みDBから予想相場・予想利益を計算（できれば付けておく）
-                pred = predict_profit(it, souba)
-                if pred:
-                    it["prediction"] = pred
+                # 商品写真をメルカリ相場DBと見比べる（画像の指紋で照合）
+                match = None
+                if image_match_ready() and it.get("image"):
+                    match = souba_match.match_item(it, souba)
+                if match:
+                    it["img_match"] = match  # 通知カードに表示するため覚えておく
                 if profit_only:
-                    # ②ブランドは「予想利益が通知ライン以上」の時だけ通知する
-                    if not pred or pred["profit"] < souba["notify_line"]:
+                    # ②ブランドは『ほぼ同デザインの売却実例があり、
+                    # 予想利益が通知ライン(2000円)以上』の時だけ通知する
+                    if (not match
+                            or match["rank"] != "同デザイン"
+                            or match["profit"] is None
+                            or match["profit"] < souba["notify_line"]):
                         continue
                 keep.append(it)
             skipped = len(fresh) - len(keep)
@@ -619,6 +643,9 @@ def scan_profitable():
     新着かどうかは関係なく、今の出品の中から予想利益が通知ライン以上の商品を探す。
     （1回限りの『棚卸しスキャン』。state＝見た記録 はいじらない）
     """
+    if not image_match_ready():
+        send_text("🔎 在庫スキャン中止：画像判定の準備（相場DBかAI）が揃っていません。")
+        return
     souba = load_souba()
     excludes = load_excludes()
     MAX_HITS = int(os.environ.get("SCAN_MAX", "30"))  # 通知しすぎ防止の上限
@@ -647,20 +674,25 @@ def scan_profitable():
             for it in items:
                 if is_excluded(it, excludes):
                     continue
-                pred = predict_profit(it, souba)
-                if not pred or pred["profit"] < souba["notify_line"]:
-                    continue
                 dedup = (it.get("shop"), str(it.get("id")))
                 if dedup in seen_keys:
                     continue
                 seen_keys.add(dedup)
-                it["prediction"] = pred
+                # 商品写真をメルカリ相場DBと見比べる（画像の指紋で照合）
+                match = None
+                if it.get("image"):
+                    match = souba_match.match_item(it, souba)
+                if (not match or match["rank"] != "同デザイン"
+                        or match["profit"] is None
+                        or match["profit"] < souba["notify_line"]):
+                    continue
+                it["img_match"] = match
                 hits.append(it)
             print(f"  {site}/{b.get('keyword')}: ここまで利益候補 {len(hits)} 件")
             time.sleep(REQUEST_WAIT)
 
     # 利益が大きい順に並べる（良い物から先に届くように）
-    hits.sort(key=lambda x: x["prediction"]["profit"], reverse=True)
+    hits.sort(key=lambda x: x["img_match"]["profit"], reverse=True)
     total = len(hits)
     print(f"利益が出そうな在庫: {total} 件")
 
