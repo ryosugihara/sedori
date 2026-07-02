@@ -130,6 +130,28 @@ def fetch_sold(keyword, page_size=120):
     return out
 
 
+ITEM_API = "https://api.mercari.jp/items/get"
+
+
+def fetch_item(item_id):
+    """1つの商品の詳細（写真の一覧など）を取る。失敗したら None。
+    ※精度測定など少量の用途だけに使う（大量アクセスはしない）
+    """
+    url = f"{ITEM_API}?id={item_id}"
+    req = urllib.request.Request(url, method="GET")
+    req.add_header("Accept", "*/*")
+    req.add_header("X-Platform", "web")
+    req.add_header("DPoP", _make_dpop(ITEM_API, "GET"))
+    req.add_header("User-Agent", UA)
+    try:
+        with urllib.request.urlopen(req, timeout=30) as res:
+            data = json.loads(res.read().decode("utf-8"))
+        return data.get("data")
+    except Exception as e:
+        print(f"  商品詳細の取得失敗 ({item_id}): {e}")
+        return None
+
+
 def get_souba(keyword, brand_keys=None, page_size=120):
     """キーワードの相場をまとめて返す。
     brand_keys を渡すと、商品名/ブランドにその語を含む物だけで計算（ノイズ除去）。

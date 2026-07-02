@@ -30,7 +30,7 @@ KEYWORDS = [
     "バルマン ジャケット",
     "ナンバーナイン パーカー",
 ]
-PAIRS_PER_KW = 25       # 1キーワードあたり同商品ペアをいくつ測るか
+PAIRS_PER_KW = 15       # 1キーワードあたり同商品ペアをいくつ測るか
 REPORT = "recon/CALIB.txt"
 
 
@@ -65,19 +65,26 @@ def main():
     for kw in KEYWORDS:
         items = mercari.fetch_sold(kw)
         time.sleep(1.5)
-        multi = [it for it in items if len(it.get("thumbnails", [])) >= 2]
-        random.shuffle(multi)
-        print(f"「{kw}」 写真2枚以上の商品: {len(multi)}件")
+        random.shuffle(items)
+        print(f"「{kw}」 検索結果: {len(items)}件")
 
-        # --- 同じ商品ペア（写真1枚目 vs 2枚目）---
+        # --- 同じ商品ペア（商品詳細から写真1枚目 vs 2枚目）---
         used = []
-        for it in multi[:PAIRS_PER_KW]:
+        for it in items:
+            if len(used) >= PAIRS_PER_KW:
+                break
+            detail = mercari.fetch_item(it["id"])
+            time.sleep(1.0)  # 詳細の取得はゆっくり（メルカリに優しく）
+            photos = (detail or {}).get("photos") or []
+            if len(photos) < 2:
+                continue
             try:
-                a = fetch_raw(it["thumbnails"][0])
-                b = fetch_raw(it["thumbnails"][1])
+                a = fetch_raw(photos[0])
+                b = fetch_raw(photos[1])
                 c, d = sims(a, b)
                 pos_c.append(c); pos_d.append(d)
                 used.append((it, a))  # 1枚目は違う商品ペアにも再利用する
+                print(f"  同商品ペア {len(used)}組目 CLIP={c:.3f} DINO={d:.3f}")
             except Exception as e:
                 print(f"  スキップ: {e}")
 
@@ -90,19 +97,23 @@ def main():
                 print(f"  スキップ: {e}")
 
     pos_c.sort(); pos_d.sort(); neg_c.sort(); neg_d.sort()
-    lines = [
-        f"精度測定の結果  同じ商品ペア {len(pos_c)}組 / 違う商品ペア {len(neg_c)}組",
-        "",
-        "【CLIP】",
-        f"  同じ商品:  低い方5% {pct(pos_c,5):.3f} / 25% {pct(pos_c,25):.3f} / 中央 {pct(pos_c,50):.3f}",
-        f"  違う商品:  中央 {pct(neg_c,50):.3f} / 95% {pct(neg_c,95):.3f} / 最高 {neg_c[-1]:.3f}",
-        "",
-        "【DINOv2】",
-        f"  同じ商品:  低い方5% {pct(pos_d,5):.3f} / 25% {pct(pos_d,25):.3f} / 中央 {pct(pos_d,50):.3f}",
-        f"  違う商品:  中央 {pct(neg_d,50):.3f} / 95% {pct(neg_d,95):.3f} / 最高 {neg_d[-1]:.3f}",
-        "",
-        "→『違う商品の95%/最高』より上に『同じ商品の大半』が来るAIほど使える。",
-    ]
+    if not pos_c or not neg_c:
+        lines = [f"測定できず: 同じ商品ペア {len(pos_c)}組 / 違う商品ペア {len(neg_c)}組",
+                 "（商品詳細から写真一覧が取れなかった可能性）"]
+    else:
+        lines = [
+            f"精度測定の結果  同じ商品ペア {len(pos_c)}組 / 違う商品ペア {len(neg_c)}組",
+            "",
+            "【CLIP】",
+            f"  同じ商品:  低い方5% {pct(pos_c,5):.3f} / 25% {pct(pos_c,25):.3f} / 中央 {pct(pos_c,50):.3f}",
+            f"  違う商品:  中央 {pct(neg_c,50):.3f} / 95% {pct(neg_c,95):.3f} / 最高 {neg_c[-1]:.3f}",
+            "",
+            "【DINOv2】",
+            f"  同じ商品:  低い方5% {pct(pos_d,5):.3f} / 25% {pct(pos_d,25):.3f} / 中央 {pct(pos_d,50):.3f}",
+            f"  違う商品:  中央 {pct(neg_d,50):.3f} / 95% {pct(neg_d,95):.3f} / 最高 {neg_d[-1]:.3f}",
+            "",
+            "→『違う商品の95%/最高』より上に『同じ商品の大半』が来るAIほど使える。",
+        ]
     report = "\n".join(lines)
     os.makedirs("recon", exist_ok=True)
     with open(REPORT, "w", encoding="utf-8") as f:
