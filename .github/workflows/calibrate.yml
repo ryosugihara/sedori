@@ -34,7 +34,7 @@ jobs:
 
       - name: AIの道具を入れる
         run: |
-          pip install --quiet torch --index-url https://download.pytorch.org/whl/cpu
+          pip install --quiet torch torchvision --index-url https://download.pytorch.org/whl/cpu
           pip install --quiet sentence-transformers transformers pillow pyjwt cryptography
 
       - name: 精度測定を実行
