@@ -3,12 +3,15 @@ name: 画像判定テスト
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - claude/adoring-bell-7rqznj
-    paths:
-      - "scripts/demo_match.py"
-      - ".github/workflows/demo-match.yml"
+    inputs:
+      brands:
+        description: "対象ブランド(カンマ区切り。空なら②全部)"
+        default: ""
+        required: false
+      per_brand:
+        description: "1ブランドあたり調べる件数"
+        default: "12"
+        required: false
 
 permissions:
   contents: write
@@ -40,6 +43,8 @@ jobs:
       - name: テスト通知を実行
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          DEMO_BRANDS: ${{ github.event.inputs.brands }}
+          DEMO_PER_BRAND: ${{ github.event.inputs.per_brand || '12' }}
         run: python scripts/demo_match.py
 
       - name: 結果メモを保存

@@ -21,7 +21,9 @@ import trefac
 import rinkan
 import hardoff
 
-PER_BRAND = 12  # 1ブランドあたり何件ためすか（多すぎると時間がかかる）
+# 1ブランドあたり何件ためすか／対象ブランド（環境変数で変えられる）
+PER_BRAND = int(os.environ.get("DEMO_PER_BRAND", "12"))
+ONLY_BRANDS = [s.strip() for s in os.environ.get("DEMO_BRANDS", "").split(",") if s.strip()]
 REPORT_FILE = "recon/DEMO_MATCH.txt"
 
 
@@ -45,6 +47,8 @@ def main():
         for b in brands:
             if not b.get("profit_only"):
                 continue  # テスト対象は②ブランドだけ
+            if ONLY_BRANDS and b["name"] not in ONLY_BRANDS:
+                continue  # ブランド指定がある時は、その子たちだけ
             try:
                 items = get_items(b)
             except Exception as e:
