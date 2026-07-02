@@ -36,10 +36,14 @@ def search_url(keyword):
     )
 
 
+# 通知で送った「根拠リンク」がちゃんと生きているかを確認する。
+# 同じ商品を2つのリンク形式で試す（jp.mercari.com と item.mercari.com）。
 TARGET_URLS = [
-    search_url("サンローラン スキニー 黒 S"),     # 色・サイズ込みの相場
-    search_url("サンローラン スキニー 黒 M"),     # サイズ違いで比較
-    search_url("アンダーカバー デニム"),          # 別ブランドでも確認
+    "https://jp.mercari.com/item/m89440520190",
+    "https://jp.mercari.com/item/m69539026459",
+    "https://jp.mercari.com/item/m88593701431",
+    "https://item.mercari.com/jp/m89440520190/",   # 昔からある共有リンク形式
+    "https://item.mercari.com/jp/m69539026459/",
 ]
 
 # 本物のブラウザのふりをするための情報（これがないと弾かれやすい）
@@ -75,6 +79,7 @@ def analyze(body):
         html = body.decode("utf-8", errors="replace")
     except Exception:
         html = ""
+    m_title = re.search(r"<title>([^<]*)</title>", html)
     return {
         "has_next_data": "__NEXT_DATA__" in html,   # Next.js が埋め込む初期データ
         "n_itemName": len(re.findall(r"itemName", html)),
@@ -82,6 +87,11 @@ def analyze(body):
         "n_item_id": len(re.findall(r'"m\d{6,}"', html)),  # メルカリ商品ID(m+数字)
         "looks_blocked": ("Access Denied" in html or "captcha" in html.lower()
                           or "ロボット" in html),
+        "title": (m_title.group(1)[:60] if m_title else ""),
+        # 商品ページが死んでいる時に出る文言たち
+        "error_text": [t for t in ["エラーが発生しました", "存在しない", "削除され",
+                                   "ページが見つかりません", "not found"]
+                       if t in html],
     }
 
 
@@ -121,10 +131,10 @@ def main():
                   else "🟡 データ見当たらず")
         )
         line = (
-            f"[{i}] status={status} size={size:,}B {verdict}\n"
-            f"    NEXT_DATA={info['has_next_data']} "
-            f"itemName={info['n_itemName']} price={info['n_price']} "
-            f"商品ID={info['n_item_id']}"
+            f"[{i}] {url}\n"
+            f"    status={status} size={size:,}B {verdict}\n"
+            f"    final={final_url}\n"
+            f"    title={info['title']} エラー文言={info['error_text']}"
         )
         print(line)
         lines.append(line)
