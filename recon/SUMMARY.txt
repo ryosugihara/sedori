@@ -1,14 +1,22 @@
-メルカリ 相場 自動取得テスト  2026-06-25 10:10:30
+メルカリ 相場取得テスト  実行時刻: 2026-07-02 02:31:38
 
-[1] 「サンローラン スキニー 黒 S」 status=200 🟢 取得成功 件数=119
-     - ksubi 00s SWAG DENIM Y2K Grung / ¥8400 / ITEM_STATUS_SOLD_OUT
-     - SAINT LAURENT PARIS ゼブラ柄 半袖シルク / ¥24000 / ITEM_STATUS_SOLD_OUT
-     - SAINT LAURENT PARIS スキニーデニムパンツ / ¥23000 / ITEM_STATUS_SOLD_OUT
-[2] 「サンローラン スキニー 黒 M」 status=200 🟢 取得成功 件数=119
-     - サンローラン パリ SAINT LAURENT PARIS  / ¥15500 / ITEM_STATUS_SOLD_OUT
-     - 2020 SAINT LAURENT サンローラン スキニー / ¥24800 / ITEM_STATUS_SOLD_OUT
-     - SAINT LAURENT PARIS (サンローランパリ) / ¥11753 / ITEM_STATUS_SOLD_OUT
-[3] 「アンダーカバー デニム」 status=200 🟢 取得成功 件数=119
-     - アンダーカバー  UCV1503 ダメージ加工デニムスウェッ / ¥16200 / ITEM_STATUS_SOLD_OUT
-     - アンダーカバー  05SS  5S226-P3 クラッシュリ / ¥109420 / ITEM_STATUS_SOLD_OUT
-     - アンダーカバー UNDERCOVER TYPE 3 トラッカ / ¥30460 / ITEM_STATUS_SOLD_OUT
+[1] https://jp.mercari.com/item/m89440520190
+    status=200 size=525,763B 🟢 商品データあり
+    final=https://jp.mercari.com/item/m89440520190
+    title=メルカリ エラー文言=['エラーが発生しました', '削除され', 'ページが見つかりません']
+[2] https://jp.mercari.com/item/m69539026459
+    status=200 size=525,487B 🟢 商品データあり
+    final=https://jp.mercari.com/item/m69539026459
+    title=メルカリ エラー文言=['エラーが発生しました', '削除され', 'ページが見つかりません']
+[3] https://jp.mercari.com/item/m88593701431
+    status=200 size=525,679B 🟢 商品データあり
+    final=https://jp.mercari.com/item/m88593701431
+    title=メルカリ エラー文言=['エラーが発生しました', '削除され', 'ページが見つかりません']
+[4] https://item.mercari.com/jp/m89440520190/
+    status=200 size=525,763B 🟢 商品データあり
+    final=https://jp.mercari.com/item/m89440520190
+    title=メルカリ エラー文言=['エラーが発生しました', '削除され', 'ページが見つかりません']
+[5] https://item.mercari.com/jp/m69539026459/
+    status=200 size=525,487B 🟢 商品データあり
+    final=https://jp.mercari.com/item/m69539026459
+    title=メルカリ エラー文言=['エラーが発生しました', '削除され', 'ページが見つかりません']
