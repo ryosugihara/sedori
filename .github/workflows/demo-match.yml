@@ -1,0 +1,53 @@
+# 画像判定のテスト通知（手動＋このファイル/スクリプト更新時に自動実行）
+name: 画像判定テスト
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - claude/adoring-bell-7rqznj
+    paths:
+      - "scripts/demo_match.py"
+      - ".github/workflows/demo-match.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  demo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: リポジトリを取得
+        uses: actions/checkout@v4
+
+      - name: Pythonを準備
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: AIモデルの置き場をキャッシュ（2回目から速くなる）
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: clip-vit-b-32
+
+      - name: 画像判定AIを準備
+        run: |
+          pip install --quiet torch --index-url https://download.pytorch.org/whl/cpu
+          pip install --quiet sentence-transformers pillow
+
+      - name: テスト通知を実行
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: python scripts/demo_match.py
+
+      - name: 結果メモを保存
+        if: always()
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add recon
+          git commit -m "画像判定テスト結果を保存 [skip ci]" || echo "変更なし"
+          git pull --rebase origin ${{ github.ref_name }} || true
+          git push || echo "push スキップ"
