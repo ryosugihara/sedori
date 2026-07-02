@@ -75,6 +75,12 @@ def main():
         brands = json.load(f).get("brands", [])
 
     con = open_db()
+    # メルカリショップ（業者の店）が混ざっていたら消す（相場が業者価格でズレるため）。
+    # 普通のメルカリの商品IDは「m+数字」。それ以外を削除する。
+    removed = con.execute("DELETE FROM items WHERE id NOT GLOB 'm[0-9]*'").rowcount
+    if removed:
+        con.commit()
+        print(f"メルカリショップの混入 {removed} 件をDBから削除しました")
     known = {r[0] for r in con.execute("SELECT id FROM items")}
     print(f"相場収集を開始（DBには今 {len(known)} 件）")
 

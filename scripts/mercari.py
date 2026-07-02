@@ -12,6 +12,7 @@
 """
 
 import os
+import re
 import json
 import time
 import uuid
@@ -93,6 +94,12 @@ def fetch_sold(keyword, page_size=120):
         return []
     out = []
     for it in data.get("items", []):
+        # メルカリショップ（業者の店）は除外する。
+        # 理由: ①業者価格なので個人間の相場とズレる ②商品リンクの形式が違い開けない。
+        # 普通のメルカリの商品IDは「m+数字」（例 m12345678901）なので、それ以外を弾く。
+        item_id = str(it.get("id", ""))
+        if not re.fullmatch(r"m\d+", item_id):
+            continue
         try:
             price = int(it.get("price"))
         except Exception:
