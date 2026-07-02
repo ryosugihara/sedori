@@ -77,6 +77,14 @@ def _search_body(keyword, page_size=120):
     }
 
 
+def _to_int(v):
+    """'1719...'のような文字列の数字を int にする（できなければ None）"""
+    try:
+        return int(v)
+    except Exception:
+        return None
+
+
 def fetch_sold(keyword, page_size=120):
     """キーワードで売り切れ商品を取得し、商品の辞書リストを返す（失敗時は空）"""
     body = json.dumps(_search_body(keyword, page_size)).encode("utf-8")
@@ -115,6 +123,8 @@ def fetch_sold(keyword, page_size=120):
             "size": size,
             "image": thumbs[0] if thumbs else "",          # 商品写真(サムネイル)のURL
             "condition_id": it.get("itemConditionId"),      # 状態ランク(1=新品寄り〜6)
+            # いつの取引か（updated=最終更新。売れた頃の時刻として使う）
+            "updated": _to_int(it.get("updated")) or _to_int(it.get("created")),
         })
     return out
 

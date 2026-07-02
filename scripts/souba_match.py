@@ -17,12 +17,23 @@ rank の意味:
 
 import os
 import re
+import json
+import time
 import sqlite3
 import statistics
 
 DB_FILE = "data/souba_db.sqlite"
 
 _cache = {"loaded": False, "brands": {}}
+
+
+def _souba_days():
+    """相場を何日分まで参照するか（souba.json の設定。既定=半年183日）"""
+    try:
+        with open("souba.json", "r", encoding="utf-8") as f:
+            return int(json.load(f).get("設定", {}).get("相場参照期間_日", 183))
+    except Exception:
+        return 183
 
 
 def _norm_brand(name):
@@ -49,10 +60,20 @@ def _load():
     _cache["loaded"] = True
     import numpy as np
     con = sqlite3.connect(DB_FILE)
-    rows = con.execute(
-        "SELECT id, name, price, brand, size, image_url, vec "
-        "FROM items WHERE vec IS NOT NULL"
-    ).fetchall()
+    # 相場は変動するので、新しい取引（既定：半年以内）だけを参照する
+    cutoff = int(time.time()) - _souba_days() * 86400
+    cols = [r[1] for r in con.execute("PRAGMA table_info(items)")]
+    if "updated" in cols:
+        rows = con.execute(
+            "SELECT id, name, price, brand, size, image_url, vec "
+            "FROM items WHERE vec IS NOT NULL "
+            "AND (updated IS NULL OR updated >= ?)", (cutoff,)
+        ).fetchall()
+    else:  # 古い形のDBでも動くように
+        rows = con.execute(
+            "SELECT id, name, price, brand, size, image_url, vec "
+            "FROM items WHERE vec IS NOT NULL"
+        ).fetchall()
     con.close()
 
     groups = {}

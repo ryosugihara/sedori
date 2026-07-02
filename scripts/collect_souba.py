@@ -49,10 +49,24 @@ def open_db():
             image_url TEXT,           -- 商品写真のURL
             keyword TEXT,             -- どの検索で見つけたか
             added TEXT,               -- DBに入れた日時
-            vec BLOB                  -- 画像の指紋(float16×512)
+            vec BLOB,                 -- 画像の指紋(float16×512)
+            updated INTEGER           -- いつの取引か(相場の鮮度チェックに使う)
         )
     """)
+    # 昔に作ったDBに updated 列が無ければ足す（引っ越し処理）
+    cols = [r[1] for r in con.execute("PRAGMA table_info(items)")]
+    if "updated" not in cols:
+        con.execute("ALTER TABLE items ADD COLUMN updated INTEGER")
     return con
+
+
+def souba_days():
+    """相場を何日分まで参照するか（souba.json の設定。既定=半年183日）"""
+    try:
+        with open("souba.json", "r", encoding="utf-8") as f:
+            return int(json.load(f).get("設定", {}).get("相場参照期間_日", 183))
+    except Exception:
+        return 183
 
 
 def send_discord(message):
@@ -81,6 +95,15 @@ def main():
     if removed:
         con.commit()
         print(f"メルカリショップの混入 {removed} 件をDBから削除しました")
+    # 相場は変動するので、古い取引（既定：半年より前）はDBから消す
+    days = souba_days()
+    cutoff = int(time.time()) - days * 86400
+    expired = con.execute(
+        "DELETE FROM items WHERE updated IS NOT NULL AND updated < ?", (cutoff,)
+    ).rowcount
+    if expired:
+        con.commit()
+        print(f"{days}日より古い取引 {expired} 件をDBから削除しました（相場の鮮度維持）")
     known = {r[0] for r in con.execute("SELECT id FROM items")}
     print(f"相場収集を開始（DBには今 {len(known)} 件）")
 
@@ -93,7 +116,17 @@ def main():
         for kw in b.get("keywords", []):
             items = mercari.fetch_sold(kw)
             time.sleep(REQUEST_WAIT)
-            fresh = [it for it in items if it["id"] and it["id"] not in known]
+            # すでにDBにある商品には「いつの取引か」だけ書き込む（まだ無い行だけ）
+            for it in items:
+                if it.get("updated") and it["id"] in known:
+                    con.execute(
+                        "UPDATE items SET updated=? WHERE id=? AND updated IS NULL",
+                        (it["updated"], it["id"]),
+                    )
+            # まだDBに無くて、かつ取引が新しい（半年以内）物だけを入れる
+            fresh = [it for it in items
+                     if it["id"] and it["id"] not in known
+                     and not (it.get("updated") and it["updated"] < cutoff)]
             print(f"  「{kw}」 取得{len(items)}件 / 新規{len(fresh)}件")
 
             for it in fresh:
@@ -107,14 +140,23 @@ def main():
                 if vec is None:
                     no_image += 1
                 con.execute(
-                    "INSERT OR IGNORE INTO items VALUES (?,?,?,?,?,?,?,?,?,?)",
+                    "INSERT OR IGNORE INTO items "
+                    "(id, name, price, brand, size, condition_id, image_url, "
+                    " keyword, added, vec, updated) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
                     (it["id"], it["name"], it["price"], b["name"], it["size"],
-                     it.get("condition_id"), it.get("image"), kw, now, vec),
+                     it.get("condition_id"), it.get("image"), kw, now, vec,
+                     it.get("updated")),
                 )
                 known.add(it["id"])
                 added += 1
                 per_brand[b["name"]] = per_brand.get(b["name"], 0) + 1
             con.commit()
+
+    # 取引日時がまだ埋まらなかった行は「DBに入れた日」で代用する
+    # （こうすると全部の行が半年たてば自動で消え、古い相場が残らない）
+    con.execute("UPDATE items SET updated = CAST(strftime('%s', added) AS INTEGER) "
+                "WHERE updated IS NULL AND added IS NOT NULL")
+    con.commit()
 
     total = con.execute("SELECT COUNT(*) FROM items").fetchone()[0]
     with_vec = con.execute("SELECT COUNT(*) FROM items WHERE vec IS NOT NULL").fetchone()[0]
