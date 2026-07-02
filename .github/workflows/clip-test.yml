@@ -1,0 +1,49 @@
+# CLIP（無料の画像AI）が GitHub の無料マシンで動くかの実験
+name: CLIP動作実験
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - claude/adoring-bell-7rqznj
+    paths:
+      - "scripts/clip_test.py"
+      - ".github/workflows/clip-test.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  clip-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: リポジトリを取得
+        uses: actions/checkout@v4
+
+      - name: Pythonを準備
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: CLIPを入れる（CPU版・時間を計る）
+        run: |
+          START=$(date +%s)
+          pip install --quiet torch --index-url https://download.pytorch.org/whl/cpu
+          pip install --quiet sentence-transformers pillow
+          echo "インストール時間: $(( $(date +%s) - START )) 秒"
+
+      - name: 実験を実行
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: python scripts/clip_test.py
+
+      - name: 結果を保存
+        if: always()
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add recon
+          git commit -m "CLIP実験結果を保存 [skip ci]" || echo "変更なし"
+          git pull --rebase origin ${{ github.ref_name }} || true
+          git push || echo "push スキップ"
