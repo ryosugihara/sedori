@@ -12,9 +12,13 @@ AIによる「同じ商品か」の最終確認 部品（任意機能）
 
 import os
 import json
+import time
 import base64
 import urllib.request
 import urllib.error
+
+_last_call = [0.0]  # 直前にAIを呼んだ時刻（無料枠の回数制限を守るため）
+MIN_INTERVAL = 5.0  # 呼び出しの間隔（秒）
 
 # Geminiのモデル名は世代交代が早く、古い名前は無料枠の対象外になることがある。
 # 上から順に試して、動いた物を覚えて使い続ける。
@@ -74,6 +78,11 @@ def _parse(text):
 
 def _ask_gemini(url_a, url_b, title_a, title_b):
     global _gemini_model
+    # 無料枠の「1分あたりの回数制限」を守るため、間隔をあける
+    wait = MIN_INTERVAL - (time.time() - _last_call[0])
+    if wait > 0:
+        time.sleep(wait)
+    _last_call[0] = time.time()
     b64a, ma = _fetch_b64(url_a)
     b64b, mb = _fetch_b64(url_b)
     payload = {"contents": [{"parts": [

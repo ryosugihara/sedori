@@ -162,12 +162,22 @@ def match_item(item, souba):
 
         # GG柄・モノグラム等の「どれも同じに見える柄」は、写真では
         # 型番やサイズの違いを見分けられないので、同デザインと断定しない。
-        # （繰り返し柄は幾何検証も誤って一致しやすいため、検証より先に除外）
+        # （繰り返し柄は幾何検証もAIも誤りやすいため、昇格の対象外にする）
         patterns = [p.lower() for p in souba.get("plain_patterns", [])]
         ref_text = (rs[i0][1] or "").lower()
-        if rank == "同デザイン" and any(
-                p in text or p in ref_text for p in patterns):
+        capped = any(p in text or p in ref_text for p in patterns)
+        if rank == "同デザイン" and capped:
             rank = "似た系統"
+
+        # 予想相場は『控えめ』に見積もる（高いモデルに引っ張られて
+        # 利益を過大に出さないよう、安い方から2番目の売値を使う）
+        prices = sorted(rs[i][2] for i in picked)
+        estimate = int(prices[1] if len(prices) >= 3 else prices[0])
+
+        fee, ship = souba["fee"], souba["shipping"]
+        net = int(estimate * (1 - fee) - ship)  # メルカリ手取り
+        buy = item.get("price_num")
+        profit = (net - buy) if buy else None   # 予想利益（仕入値不明なら None）
 
         # 『同デザイン』は答え合わせに合格した時だけ名乗れる（二重確認）:
         #  1) 幾何検証（無料）… 細部の点が同じ位置関係で一致するか
@@ -190,16 +200,18 @@ def match_item(item, souba):
                     verified = "AIが写真を見比べて確認"
             if not verified:
                 rank = "似た系統"  # 答え合わせに落ちたら断定しない
-
-        # 予想相場は『控えめ』に見積もる（高いモデルに引っ張られて
-        # 利益を過大に出さないよう、安い方から2番目の売値を使う）
-        prices = sorted(rs[i][2] for i in picked)
-        estimate = int(prices[1] if len(prices) >= 3 else prices[0])
-
-        fee, ship = souba["fee"], souba["shipping"]
-        net = int(estimate * (1 - fee) - ship)  # メルカリ手取り
-        buy = item.get("price_num")
-        profit = (net - buy) if buy else None   # 予想利益（仕入値不明なら None）
+        elif (rank == "似た系統" and not capped
+                and profit is not None
+                and profit >= souba.get("notify_line", 2000)):
+            # 『利益が出そうな参考候補』は、AIに写真を見比べてもらい
+            # 「同じ」と言われたら同デザインに昇格させる（AIの目のフル活用）
+            import verify_ai
+            if verify_ai.available():
+                v = verify_ai.same_product(item["image"], rs[i0][5],
+                                           item.get("title", ""), rs[i0][1] or "")
+                if v == "same":
+                    rank = "同デザイン"
+                    verified = "AIが写真を見比べて確認"
 
         r0 = rs[i0]  # 一番似ていた実例（通知で根拠として見せる）
         return {
