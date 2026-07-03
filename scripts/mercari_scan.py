@@ -104,18 +104,17 @@ def main():
 
     if strict:
         monitor.send_text(
-            f"🛒 メルカリ内スキャン結果：**同デザインの売却実例より安い出品**を "
+            f"🛒 メルカリ内スキャン結果：🟢 **同デザインの売却実例より安い出品**を "
             f"{len(strict)} 件みつけました（利益2,000円以上のみ）"
         )
         monitor.send_items(strict[:10])
-    elif loose:
+    if loose:
         monitor.send_text(
-            "🛒 メルカリ内スキャン結果：『同デザイン』と断定できる掘り出し物は"
-            "ありませんでした。参考までに『似た系統で利益が出そうな物』を送ります"
-            "（同じ商品かはあなたの目で確認してください）"
+            f"🟡 参考：**似た系統で利益が出そうな出品** 上位{min(len(loose), 10)}件"
+            "（同じ商品と断定はできていません。カードの上下の写真を見比べて判断してください）"
         )
-        monitor.send_items(loose[:5])
-    else:
+        monitor.send_items(loose[:10])
+    if not strict and not loose:
         monitor.send_text(
             f"🛒 メルカリ内スキャン結果：{checked}件を照合しましたが、"
             "利益が出そうな出品は今はありませんでした。"
