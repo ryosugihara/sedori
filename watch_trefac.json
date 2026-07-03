@@ -84,6 +84,11 @@
       "name": "MIU MIU",
       "keyword": "MIU MIU",
       "profit_only": true
+    },
+    {
+      "name": "COACH",
+      "keyword": "OLD COACH",
+      "profit_only": true
     }
   ]
 }

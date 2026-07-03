@@ -84,6 +84,11 @@
       "name": "MIU MIU",
       "keyword": "MIUMIU",
       "profit_only": true
+    },
+    {
+      "name": "COACH",
+      "keyword": "オールドコーチ",
+      "profit_only": true
     }
   ]
 }
