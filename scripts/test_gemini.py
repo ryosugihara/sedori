@@ -39,6 +39,21 @@ def main():
         send_discord(msg)
         return
 
+    # 診断: このカギで使えるモデルの一覧を表示（原因調査に役立つ）
+    key = os.environ.get("GEMINI_API_KEY", "").strip()
+    if key:
+        try:
+            url = ("https://generativelanguage.googleapis.com/v1beta/models"
+                   f"?key={key}&pageSize=50")
+            with urllib.request.urlopen(url, timeout=30) as res:
+                models = json.loads(res.read().decode()).get("models", [])
+            flash = [m["name"].split("/")[-1] for m in models
+                     if "flash" in m["name"] and
+                     "generateContent" in m.get("supportedGenerationMethods", [])]
+            print("使えるflash系モデル:", flash[:12])
+        except Exception as e:
+            print(f"モデル一覧の取得に失敗: {e}")
+
     con = sqlite3.connect(DB)
     # 商品写真を2枚（バッグ1枚・Tシャツ1枚 = 明らかに違う商品）取り出す
     bag = con.execute(

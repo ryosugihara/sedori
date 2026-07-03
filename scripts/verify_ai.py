@@ -14,10 +14,18 @@ import os
 import json
 import base64
 import urllib.request
+import urllib.error
 
-GEMINI_MODEL = "gemini-2.0-flash"
-GEMINI_URL = ("https://generativelanguage.googleapis.com/v1beta/models/"
-              f"{GEMINI_MODEL}:generateContent")
+# Geminiのモデル名は世代交代が早く、古い名前は無料枠の対象外になることがある。
+# 上から順に試して、動いた物を覚えて使い続ける。
+GEMINI_MODELS = [
+    "gemini-2.5-flash-lite",
+    "gemini-2.5-flash",
+    "gemini-flash-latest",
+    "gemini-2.0-flash",
+]
+GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
+_gemini_model = None  # 動いたモデル名を覚えておく
 CLAUDE_URL = "https://api.anthropic.com/v1/messages"
 CLAUDE_MODEL = "claude-haiku-4-5-20251001"
 
@@ -65,6 +73,7 @@ def _parse(text):
 
 
 def _ask_gemini(url_a, url_b, title_a, title_b):
+    global _gemini_model
     b64a, ma = _fetch_b64(url_a)
     b64b, mb = _fetch_b64(url_b)
     payload = {"contents": [{"parts": [
@@ -73,14 +82,37 @@ def _ask_gemini(url_a, url_b, title_a, title_b):
         {"text": _prompt(title_a, title_b)},
     ]}]}
     key = os.environ["GEMINI_API_KEY"].strip()
-    req = urllib.request.Request(
-        GEMINI_URL + f"?key={key}",
-        data=json.dumps(payload).encode("utf-8"), method="POST",
-        headers={"Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=60) as res:
-        data = json.loads(res.read().decode("utf-8"))
-    parts = (data.get("candidates") or [{}])[0].get("content", {}).get("parts", [])
-    return _parse("".join(p.get("text", "") for p in parts))
+    body = json.dumps(payload).encode("utf-8")
+
+    # 動くモデルが分かっていればそれだけ、まだなら候補を上から順に試す
+    models = [_gemini_model] if _gemini_model else GEMINI_MODELS
+    last_err = None
+    for model in models:
+        req = urllib.request.Request(
+            f"{GEMINI_BASE}/{model}:generateContent?key={key}",
+            data=body, method="POST",
+            headers={"Content-Type": "application/json"})
+        try:
+            with urllib.request.urlopen(req, timeout=60) as res:
+                data = json.loads(res.read().decode("utf-8"))
+            if _gemini_model != model:
+                _gemini_model = model
+                print(f"  Gemini: モデル {model} を使用")
+            parts = (data.get("candidates") or [{}])[0].get(
+                "content", {}).get("parts", [])
+            return _parse("".join(p.get("text", "") for p in parts))
+        except urllib.error.HTTPError as e:
+            detail = ""
+            try:
+                detail = e.read().decode("utf-8", "replace")[:200]
+            except Exception:
+                pass
+            print(f"  Gemini {model}: {e.code} {detail[:120]}")
+            last_err = e
+            if e.code in (404, 429):
+                continue  # このモデルは使えない→次の候補へ
+            raise
+    raise last_err
 
 
 def _ask_claude(url_a, url_b, title_a, title_b):
