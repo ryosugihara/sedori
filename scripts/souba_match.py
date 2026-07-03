@@ -160,9 +160,18 @@ def match_item(item, souba):
         rank = ("同デザイン" if (best_c >= strong_c and best_d >= strong_d)
                 else "似た系統")
 
-        # 近い実例たちの「真ん中の値段」を予想相場にする（外れ値に強い）
-        prices = [rs[i][2] for i in picked]
-        estimate = int(statistics.median(prices))
+        # GG柄・モノグラム等の「どれも同じに見える柄」は、写真では
+        # 型番やサイズの違いを見分けられないので、同デザインと断定しない。
+        patterns = [p.lower() for p in souba.get("plain_patterns", [])]
+        ref_text = (rs[i0][1] or "").lower()
+        if rank == "同デザイン" and any(
+                p in text or p in ref_text for p in patterns):
+            rank = "似た系統"
+
+        # 予想相場は『控えめ』に見積もる（高いモデルに引っ張られて
+        # 利益を過大に出さないよう、安い方から2番目の売値を使う）
+        prices = sorted(rs[i][2] for i in picked)
+        estimate = int(prices[1] if len(prices) >= 3 else prices[0])
 
         fee, ship = souba["fee"], souba["shipping"]
         net = int(estimate * (1 - fee) - ship)  # メルカリ手取り

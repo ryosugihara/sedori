@@ -20,6 +20,7 @@ import json
 import time
 import subprocess
 import urllib.request
+import urllib.error
 import urllib.parse
 
 import trefac  # トレファク用の読み取り部品（同じフォルダの trefac.py）
@@ -215,6 +216,14 @@ def discord_post(payload):
     )
     try:
         urllib.request.urlopen(req, timeout=30)
+    except urllib.error.HTTPError as e:
+        # 失敗の理由（文字数オーバー等）をログに残す
+        body = ""
+        try:
+            body = e.read().decode("utf-8", "replace")[:300]
+        except Exception:
+            pass
+        print(f"  Discord通知に失敗: {e} {body}")
     except Exception as e:
         print(f"  Discord通知に失敗: {e}")
 
@@ -245,6 +254,8 @@ def load_souba():
         "plain_cats": s.get("画像判定_無地カテゴリ", []),
         "feature_words": s.get("画像判定_特徴語", []),
         "attr_words": s.get("画像判定_属性キーワード", []),
+        # GG柄等の「どれも同じに見える柄」は同デザイン断定しない
+        "plain_patterns": s.get("画像判定_断定しない柄", []),
         "records": data.get("records", []),
     }
 
@@ -509,11 +520,12 @@ def profit_lines(item, souba):
 
 
 def send_items(items):
-    """新着商品を Discord に通知する（見やすいカード形式・最大10件ずつ）"""
+    """新着商品を Discord に通知する（見やすいカード形式・4件ずつ）"""
     souba = load_souba()  # 相場メモを読み込む（利益判定に使う）
-    # Discord は1メッセージに最大10個のカード(embed)まで入れられる
-    for i in range(0, len(items), 10):
-        chunk = items[i:i + 10]
+    # Discordは1メッセージの文字量に上限(6000字)があるため、
+    # カードを詰め込みすぎると丸ごと失敗する。4件ずつなら安全。
+    for i in range(0, len(items), 4):
+        chunk = items[i:i + 4]
         embeds = []
         for it in chunk:
             # お店の名前があれば一緒に表示する（KINDAL / トレファク）
