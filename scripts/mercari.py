@@ -55,7 +55,7 @@ def _make_dpop(url, method="POST"):
     return jwt.encode(payload, key, algorithm="ES256", headers=headers)
 
 
-def _search_body(keyword, page_size=120):
+def _search_body(keyword, page_size=120, status="STATUS_SOLD_OUT"):
     """検索APIに送るデータ。status=売り切れ で実売相場を狙う。"""
     return {
         "userId": "", "pageSize": page_size, "pageToken": "",
@@ -65,7 +65,7 @@ def _search_body(keyword, page_size=120):
         "searchCondition": {
             "keyword": keyword, "excludeKeyword": "",
             "sort": "SORT_CREATED_TIME", "order": "ORDER_DESC",
-            "status": ["STATUS_SOLD_OUT"],
+            "status": [status],  # SOLD_OUT=売り切れ(相場用) / ON_SALE=販売中(仕入れ探し用)
             "sizeId": [], "categoryId": [], "brandId": [], "sellerId": [],
             "priceMin": 0, "priceMax": 0, "itemConditionId": [],
             "shippingPayerId": [], "shippingFromArea": [], "shippingMethod": [],
@@ -85,9 +85,11 @@ def _to_int(v):
         return None
 
 
-def fetch_sold(keyword, page_size=120):
-    """キーワードで売り切れ商品を取得し、商品の辞書リストを返す（失敗時は空）"""
-    body = json.dumps(_search_body(keyword, page_size)).encode("utf-8")
+def fetch_sold(keyword, page_size=120, status="STATUS_SOLD_OUT"):
+    """キーワードで商品を取得し、商品の辞書リストを返す（失敗時は空）。
+    status を変えると「売り切れ(相場)」「販売中(仕入れ探し)」を切り替えられる。
+    """
+    body = json.dumps(_search_body(keyword, page_size, status)).encode("utf-8")
     req = urllib.request.Request(API_URL, data=body, method="POST")
     req.add_header("Content-Type", "application/json")
     req.add_header("Accept", "*/*")
@@ -128,6 +130,11 @@ def fetch_sold(keyword, page_size=120):
             "updated": _to_int(it.get("updated")) or _to_int(it.get("created")),
         })
     return out
+
+
+def fetch_on_sale(keyword, page_size=120):
+    """いま販売中の商品を取得する（メルカリ内で安い出品を探す用）"""
+    return fetch_sold(keyword, page_size, status="STATUS_ON_SALE")
 
 
 ITEM_API = "https://api.mercari.jp/items/get"
