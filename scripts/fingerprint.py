@@ -92,14 +92,25 @@ def embed_image_bytes_dino(raw):
     return vec.astype("float32")
 
 
+def download_bytes(url, timeout=20):
+    """画像URLをダウンロードして生データを返す（失敗したら None）"""
+    try:
+        req = urllib.request.Request(url, headers=UA)
+        with urllib.request.urlopen(req, timeout=timeout) as res:
+            return res.read()
+    except Exception as e:
+        print(f"  画像の取得に失敗 ({str(url)[:60]}): {e}")
+        return None
+
+
 def embed_image_url_both(url, timeout=20):
     """画像URLを1回だけダウンロードして、(CLIP指紋, DINOv2指紋) を返す。
     失敗したら (None, None)。
     """
+    raw = download_bytes(url, timeout)
+    if raw is None:
+        return None, None
     try:
-        req = urllib.request.Request(url, headers=UA)
-        with urllib.request.urlopen(req, timeout=timeout) as res:
-            raw = res.read()
         return embed_image_bytes(raw), embed_image_bytes_dino(raw)
     except Exception as e:
         print(f"  画像の指紋化に失敗 ({str(url)[:60]}): {e}")

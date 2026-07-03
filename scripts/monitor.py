@@ -256,6 +256,8 @@ def load_souba():
         "attr_words": s.get("画像判定_属性キーワード", []),
         # GG柄等の「どれも同じに見える柄」は同デザイン断定しない
         "plain_patterns": s.get("画像判定_断定しない柄", []),
+        # 同デザイン断定に必要な幾何検証の一致点数（答え合わせの合格ライン）
+        "geo_inliers": s.get("画像判定_幾何一致点数", 15),
         "records": data.get("records", []),
     }
 
@@ -488,6 +490,8 @@ def profit_lines(item, souba):
             f"🖼️ {mark} {m['rank']}の売却実例あり"
             f"（同一度{m['best_sim']:.2f}/系統{m.get('clip_sim', 0):.2f}・{m['count']}件）"
         )
+        if m.get("verified"):
+            lines.append(f"✅ 二重確認済み: {m['verified']}")
         lines.append(f"🎯 予想相場 ¥{m['estimate']:,} → 手取り ¥{m['net']:,}")
         if m["profit"] is not None:
             lines.append(f"💰 予想利益 約¥{m['profit']:,}")

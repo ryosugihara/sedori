@@ -36,7 +36,7 @@ jobs:
       - name: 必要な道具を入れる
         run: |
           pip install --quiet torch torchvision --index-url https://download.pytorch.org/whl/cpu
-          pip install --quiet sentence-transformers pillow pyjwt cryptography
+          pip install --quiet opencv-python-headless sentence-transformers pillow pyjwt cryptography
 
       - name: 相場を収集してDBに保存
         env:

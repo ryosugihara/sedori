@@ -162,11 +162,34 @@ def match_item(item, souba):
 
         # GG柄・モノグラム等の「どれも同じに見える柄」は、写真では
         # 型番やサイズの違いを見分けられないので、同デザインと断定しない。
+        # （繰り返し柄は幾何検証も誤って一致しやすいため、検証より先に除外）
         patterns = [p.lower() for p in souba.get("plain_patterns", [])]
         ref_text = (rs[i0][1] or "").lower()
         if rank == "同デザイン" and any(
                 p in text or p in ref_text for p in patterns):
             rank = "似た系統"
+
+        # 『同デザイン』は答え合わせに合格した時だけ名乗れる（二重確認）:
+        #  1) 幾何検証（無料）… 細部の点が同じ位置関係で一致するか
+        #  2) AI最終確認（カギがある時だけ）… AIが写真2枚を見比べて判定
+        verified = None
+        if rank == "同デザイン":
+            import geom_verify
+            import verify_ai
+            raw_item = fingerprint.download_bytes(item["image"])
+            raw_ref = fingerprint.download_bytes(rs[i0][5]) if rs[i0][5] else None
+            geo_th = int(souba.get("geo_inliers", 15))
+            inl = (geom_verify.inlier_count(raw_item, raw_ref)
+                   if raw_item and raw_ref else 0)
+            if inl >= geo_th:
+                verified = f"幾何検証OK({inl}点一致)"
+            elif verify_ai.available():
+                v = verify_ai.same_product(item["image"], rs[i0][5],
+                                           item.get("title", ""), rs[i0][1] or "")
+                if v == "same":
+                    verified = "AIが写真を見比べて確認"
+            if not verified:
+                rank = "似た系統"  # 答え合わせに落ちたら断定しない
 
         # 予想相場は『控えめ』に見積もる（高いモデルに引っ張られて
         # 利益を過大に出さないよう、安い方から2番目の売値を使う）
@@ -181,6 +204,7 @@ def match_item(item, souba):
         r0 = rs[i0]  # 一番似ていた実例（通知で根拠として見せる）
         return {
             "rank": rank,
+            "verified": verified,  # 二重確認に合格した方法（Noneなら未確認）
             "best_sim": best_d,   # 同一商品らしさ(DINO)
             "clip_sim": best_c,   # 見た目の系統の近さ(CLIP)
             "estimate": estimate,

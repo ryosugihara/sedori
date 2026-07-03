@@ -43,7 +43,7 @@ jobs:
       - name: 画像判定AIを準備（失敗しても監視は続行）
         run: |
           pip install --quiet torch torchvision --index-url https://download.pytorch.org/whl/cpu || true
-          pip install --quiet sentence-transformers pillow || true
+          pip install --quiet opencv-python-headless sentence-transformers pillow || true
 
       - name: 新着監視（ループ）を実行
         env:
@@ -51,6 +51,8 @@ jobs:
           LOOP_MODE: "1" # ループ監視を有効にする
           POLL_SECONDS: "30" # 何秒ごとにチェックするか（小さいほど速い／サイトに優しくするなら大きく）
           LOOP_MINUTES: ${{ github.event.inputs.loop_minutes || '300' }} # 1回の見張り時間（分）
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }} # 無料AIのカギ(あれば最終確認に使う)
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }} # 有料AIのカギ(任意)
         run: python scripts/monitor.py
 
       - name: 見た商品リストを保存

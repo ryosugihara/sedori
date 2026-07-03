@@ -34,12 +34,14 @@ jobs:
       - name: AIの道具を入れる
         run: |
           pip install --quiet torch torchvision --index-url https://download.pytorch.org/whl/cpu
-          pip install --quiet sentence-transformers transformers pillow pyjwt cryptography
+          pip install --quiet opencv-python-headless sentence-transformers transformers pillow pyjwt cryptography
 
       - name: メルカリ内スキャンを実行
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           SCAN_TARGETS: ${{ github.event.inputs.targets }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }} # 無料AIのカギ(あれば最終確認に使う)
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }} # 有料AIのカギ(任意)
         run: python scripts/mercari_scan.py
 
       - name: 結果メモを保存

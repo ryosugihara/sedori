@@ -35,11 +35,13 @@ jobs:
       - name: 画像判定AIを準備
         run: |
           pip install --quiet torch torchvision --index-url https://download.pytorch.org/whl/cpu
-          pip install --quiet sentence-transformers pillow
+          pip install --quiet opencv-python-headless sentence-transformers pillow
 
       - name: 在庫スキャンを実行
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           SCAN_PROFIT: "1" # 棚卸しスキャンモード
           SCAN_MAX: ${{ github.event.inputs.scan_max || '30' }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }} # 無料AIのカギ(あれば最終確認に使う)
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }} # 有料AIのカギ(任意)
         run: python scripts/monitor.py
