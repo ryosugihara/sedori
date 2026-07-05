@@ -22,7 +22,7 @@ import time
 import sqlite3
 import statistics
 
-DB_FILE = "data/souba_db.sqlite"
+DB_FILE = "せどり/データ/data/souba_db.sqlite"
 
 _cache = {"loaded": False, "brands": {}}
 
@@ -30,7 +30,7 @@ _cache = {"loaded": False, "brands": {}}
 def _souba_days():
     """相場を何日分まで参照するか（souba.json の設定。既定=半年183日）"""
     try:
-        with open("souba.json", "r", encoding="utf-8") as f:
+        with open("せどり/データ/watchlists/souba.json", "r", encoding="utf-8") as f:
             return int(json.load(f).get("設定", {}).get("相場参照期間_日", 183))
     except Exception:
         return 183

@@ -7,7 +7,7 @@ on:
     branches:
       - claude/adoring-bell-7rqznj
     paths:
-      - "scripts/test_gemini.py"
+      - "せどり/コーディング/scripts/test_gemini.py"
       - ".github/workflows/test-gemini.yml"
 
 permissions:
@@ -31,4 +31,4 @@ jobs:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: python scripts/test_gemini.py
+        run: python せどり/コーディング/scripts/test_gemini.py

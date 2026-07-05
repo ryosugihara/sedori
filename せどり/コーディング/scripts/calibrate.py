@@ -31,7 +31,7 @@ KEYWORDS = [
     "ナンバーナイン パーカー",
 ]
 PAIRS_PER_KW = 15       # 1キーワードあたり同商品ペアをいくつ測るか
-REPORT = "recon/CALIB.txt"
+REPORT = "せどり/データ/recon/CALIB.txt"
 
 
 def fetch_raw(url):
@@ -97,8 +97,8 @@ def main():
                     print(f"  スキップ: {e}")
 
     import json as _json
-    os.makedirs("recon", exist_ok=True)
-    with open("recon/CALIB_RAW.json", "w", encoding="utf-8") as f:
+    os.makedirs("せどり/データ/recon", exist_ok=True)
+    with open("せどり/データ/recon/CALIB_RAW.json", "w", encoding="utf-8") as f:
         _json.dump({"pos": pos_pairs, "neg": neg_pairs}, f)
 
     if not pos_pairs or not neg_pairs:
@@ -126,7 +126,7 @@ def main():
             fp = sum(1 for c, d in neg_pairs if c >= ct and d >= dt) / len(neg_pairs)
             lines.append(f"  CLIP{ct:.2f}/DINO{dt:.2f}   {tp*100:5.1f}%            {fp*100:5.2f}%")
     report = "\n".join(lines)
-    os.makedirs("recon", exist_ok=True)
+    os.makedirs("せどり/データ/recon", exist_ok=True)
     with open(REPORT, "w", encoding="utf-8") as f:
         f.write(report)
     print(report)

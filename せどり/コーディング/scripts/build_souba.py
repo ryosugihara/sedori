@@ -20,8 +20,8 @@ import datetime
 
 import mercari  # 同じフォルダの mercari.py（相場取得の部品）
 
-SOLD_DB_FILE = "data/sold/sold_items.json"
-OUT_FILE = "data/mercari_souba.json"
+SOLD_DB_FILE = "せどり/データ/data/sold/sold_items.json"
+OUT_FILE = "せどり/データ/data/mercari_souba.json"
 REQUEST_WAIT = 1.5  # メルカリに優しく、1件ごとに少し待つ
 
 

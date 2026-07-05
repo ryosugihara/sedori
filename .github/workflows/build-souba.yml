@@ -27,14 +27,14 @@ jobs:
       - name: 相場DBを作成
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-        run: python scripts/build_souba.py
+        run: python せどり/コーディング/scripts/build_souba.py
 
       - name: 結果を保存
         if: always()
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@users.noreply.github.com"
-          git add data/mercari_souba.json
+          git add せどり/データ/data/mercari_souba.json
           git commit -m "メルカリ相場DBを更新 [skip ci]" || echo "変更なし"
           git pull --rebase origin ${{ github.ref_name }} || true
           git push || echo "push スキップ"

@@ -57,7 +57,7 @@ HEADERS = {
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
 }
 
-OUTPUT_DIR = "recon"
+OUTPUT_DIR = "せどり/データ/recon"
 # --------------------------------------------------------------------
 
 

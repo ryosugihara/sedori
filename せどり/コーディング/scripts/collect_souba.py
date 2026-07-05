@@ -24,8 +24,8 @@ import urllib.request
 import mercari      # メルカリ検索の部品
 import fingerprint  # 画像の指紋化の部品
 
-DB_FILE = "data/souba_db.sqlite"
-CONF_FILE = "watch_mercari.json"
+DB_FILE = "せどり/データ/data/souba_db.sqlite"
+CONF_FILE = "せどり/データ/watchlists/watch_mercari.json"
 REQUEST_WAIT = 1.5   # メルカリ検索の間隔（秒）
 IMG_WAIT = 0.1       # 画像ダウンロードの間隔（画像は配信サーバーなので短くてOK）
 
@@ -66,7 +66,7 @@ def open_db():
 def souba_days():
     """相場を何日分まで参照するか（souba.json の設定。既定=半年183日）"""
     try:
-        with open("souba.json", "r", encoding="utf-8") as f:
+        with open("せどり/データ/watchlists/souba.json", "r", encoding="utf-8") as f:
             return int(json.load(f).get("設定", {}).get("相場参照期間_日", 183))
     except Exception:
         return 183

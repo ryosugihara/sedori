@@ -24,7 +24,7 @@ import hardoff
 # 1ブランドあたり何件ためすか／対象ブランド（環境変数で変えられる）
 PER_BRAND = int(os.environ.get("DEMO_PER_BRAND", "12"))
 ONLY_BRANDS = [s.strip() for s in os.environ.get("DEMO_BRANDS", "").split(",") if s.strip()]
-REPORT_FILE = "recon/DEMO_MATCH.txt"
+REPORT_FILE = "せどり/データ/recon/DEMO_MATCH.txt"
 
 
 def main():
@@ -77,7 +77,7 @@ def main():
             f"利益{profit}  根拠:{m['ref_url']}"
         )
     report = "\n".join(lines)
-    os.makedirs("recon", exist_ok=True)
+    os.makedirs("せどり/データ/recon", exist_ok=True)
     with open(REPORT_FILE, "w", encoding="utf-8") as f:
         f.write(report)
     print(report)

@@ -36,25 +36,25 @@ except Exception:
 
 # --- 設定（ここの数字や名前を変えれば動きを調整できます）-------------------
 SHOP = "https://shop.kind.co.jp"      # KINDAL 通販サイトのアドレス
-BRANDS_FILE = "watch_brands.json"     # KINDAL の見張るブランド一覧
-STATE_FILE = "state/seen.json"        # KINDAL の「見た商品」記録
+BRANDS_FILE = "せどり/データ/watchlists/watch_brands.json"     # KINDAL の見張るブランド一覧
+STATE_FILE = "せどり/データ/state/seen.json"        # KINDAL の「見た商品」記録
 
-TREFAC_BRANDS_FILE = "watch_trefac.json"     # トレファク の見張るブランド一覧
-TREFAC_STATE_FILE = "state/trefac_seen.json" # トレファク の「見た商品」記録
+TREFAC_BRANDS_FILE = "せどり/データ/watchlists/watch_trefac.json"     # トレファク の見張るブランド一覧
+TREFAC_STATE_FILE = "せどり/データ/state/trefac_seen.json" # トレファク の「見た商品」記録
 
 BRING_SHOP = "https://wastenot-official.com"  # BRING(wastenot) 通販サイト（Shopify）
-BRING_BRANDS_FILE = "watch_bring.json"        # BRING の見張るブランド一覧
-BRING_STATE_FILE = "state/bring_seen.json"    # BRING の「見た商品」記録
+BRING_BRANDS_FILE = "せどり/データ/watchlists/watch_bring.json"        # BRING の見張るブランド一覧
+BRING_STATE_FILE = "せどり/データ/state/bring_seen.json"    # BRING の「見た商品」記録
 
-RINKAN_BRANDS_FILE = "watch_rinkan.json"      # RINKAN の見張るブランド一覧
-RINKAN_STATE_FILE = "state/rinkan_seen.json"  # RINKAN の「見た商品」記録
+RINKAN_BRANDS_FILE = "せどり/データ/watchlists/watch_rinkan.json"      # RINKAN の見張るブランド一覧
+RINKAN_STATE_FILE = "せどり/データ/state/rinkan_seen.json"  # RINKAN の「見た商品」記録
 
-HARDOFF_BRANDS_FILE = "watch_hardoff.json"      # おふもーる の見張るブランド一覧
-HARDOFF_STATE_FILE = "state/hardoff_seen.json"  # おふもーる の「見た商品」記録
+HARDOFF_BRANDS_FILE = "せどり/データ/watchlists/watch_hardoff.json"      # おふもーる の見張るブランド一覧
+HARDOFF_STATE_FILE = "せどり/データ/state/hardoff_seen.json"  # おふもーる の「見た商品」記録
 
-SOUBA_FILE = "souba.json"                    # メルカリで売れた値段の記録（利益判定に使う）
-EXCLUDE_FILE = "exclude.json"                # 通知から除外する条件
-SOLD_DB_FILE = "data/sold/sold_items.json"   # 売却済み商品DB（画像から抽出した相場・Phase2で予測に使う）
+SOUBA_FILE = "せどり/データ/watchlists/souba.json"                    # メルカリで売れた値段の記録(利益判定に使う)
+EXCLUDE_FILE = "せどり/データ/watchlists/exclude.json"                # 通知から除外する条件
+SOLD_DB_FILE = "せどり/データ/data/sold/sold_items.json"   # 売却済み商品DB(画像から抽出した相場・Phase2で予測に使う)
 PER_PAGE = 250                        # 1回の取得件数（Shopifyの最大値）
 MAX_PAGES = 20                        # 安全のための上限（無限ループ防止）
 REQUEST_WAIT = 1.5                    # サイトへの優しさ（アクセスの間に待つ秒数）

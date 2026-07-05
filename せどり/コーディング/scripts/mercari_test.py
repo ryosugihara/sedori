@@ -24,7 +24,7 @@ import jwt  # PyJWT
 from cryptography.hazmat.primitives.asymmetric import ec
 
 API_URL = "https://api.mercari.jp/v2/entities:search"
-OUTPUT_DIR = "recon"
+OUTPUT_DIR = "せどり/データ/recon"
 
 # 試す検索キーワード（色・サイズ違いで相場差を見る）
 KEYWORDS = [

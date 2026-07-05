@@ -19,7 +19,7 @@ import monitor      # 通知・除外・設定の部品を再利用
 import souba_match  # 画像照合の部品
 import mercari      # メルカリ検索の部品
 
-REPORT_FILE = "recon/MERCARI_SCAN.txt"
+REPORT_FILE = "せどり/データ/recon/MERCARI_SCAN.txt"
 
 # (照合に使うブランド名, メルカリの検索キーワード)
 DEFAULT_TARGETS = [
@@ -97,7 +97,7 @@ def main():
         lines.append(f"- [{m['rank']}] {it['title'][:40]} {it['price']} "
                      f"利益¥{m['profit']:,} {it['url']}")
     report = "\n".join(lines)
-    os.makedirs("recon", exist_ok=True)
+    os.makedirs("せどり/データ/recon", exist_ok=True)
     with open(REPORT_FILE, "w", encoding="utf-8") as f:
         f.write(report)
     print(report)

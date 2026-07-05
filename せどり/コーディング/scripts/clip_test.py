@@ -22,7 +22,7 @@ import time
 import datetime
 import urllib.request
 
-RESULT_FILE = "recon/CLIP_RESULT.txt"
+RESULT_FILE = "せどり/データ/recon/CLIP_RESULT.txt"
 
 UA = {
     "User-Agent": (
@@ -65,7 +65,7 @@ def pick_test_images():
 
 
 def main():
-    os.makedirs("recon", exist_ok=True)
+    os.makedirs("せどり/データ/recon", exist_ok=True)
     lines = ["CLIP 動作実験  " + datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), ""]
 
     # --- 1. CLIPの読み込み（時間を計る）---

@@ -14,7 +14,7 @@ import urllib.request
 
 import verify_ai
 
-DB = "data/souba_db.sqlite"
+DB = "せどり/データ/data/souba_db.sqlite"
 
 
 def send_discord(msg):
