@@ -1,0 +1,26 @@
+# デモ通知（今ある商品を新着と仮定して1回だけ通知する。手動実行用）
+name: デモ通知
+
+on:
+  workflow_dispatch:
+
+# 監視ループとは別グループにして、すぐ実行されるようにする
+concurrency:
+  group: demo-notify
+
+jobs:
+  demo:
+    runs-on: ubuntu-latest
+    steps:
+      - name: リポジトリを取得
+        uses: actions/checkout@v4
+
+      - name: Pythonを準備
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: デモ通知を送信
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: python scripts/demo_notify.py

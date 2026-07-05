@@ -1,0 +1,8 @@
+{
+  "_メモ": "ここが『見張りたいブランドの一覧』です。name=通知に出る名前 / collection=KINDALの売り場の名前。あとから増やしたり減らしたりできます。",
+  "brands": [
+    { "name": "Saint Laurent", "collection": "saint-laurent-paris" },
+    { "name": "Saint Laurent", "collection": "yves-saint-laurent" },
+    { "name": "Undercover", "collection": "undercover", "only_keywords": ["デニム", "denim", "ジーンズ", "jeans"] }
+  ]
+}

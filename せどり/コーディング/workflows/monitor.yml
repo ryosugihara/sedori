@@ -1,0 +1,84 @@
+# KINDAL 新着監視（30秒ごとに見張り続けるループ方式）
+name: KINDAL新着監視
+
+on:
+  schedule:
+    # 30分ごとに「新しい見張り」を開始する（バックアップ用。普段はPATで自動再起動）
+    - cron: "*/30 * * * *"
+  workflow_dispatch: # 手動でも開始できる
+    inputs:
+      loop_minutes:
+        description: "1回の監視時間(分)。テスト用に短くもできる"
+        default: "300"
+        required: false
+
+permissions:
+  contents: write
+
+# 同時に2つ動いて記録がぶつからないようにする
+concurrency:
+  group: kindal-monitor
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360 # 安全のための最大時間（6時間）
+    steps:
+      - name: リポジトリを取得
+        uses: actions/checkout@v4
+
+      - name: Pythonを準備
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: AIモデルの置き場をキャッシュ（2回目から速くなる）
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: clip-and-dinov2
+
+      # 画像判定AI(CLIP)の道具。入らなくても監視自体は止めない（②だけ休む）
+      - name: 画像判定AIを準備（失敗しても監視は続行）
+        run: |
+          pip install --quiet torch torchvision --index-url https://download.pytorch.org/whl/cpu || true
+          pip install --quiet opencv-python-headless sentence-transformers pillow || true
+
+      - name: 新着監視（ループ）を実行
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          LOOP_MODE: "1" # ループ監視を有効にする
+          POLL_SECONDS: "30" # 何秒ごとにチェックするか（小さいほど速い／サイトに優しくするなら大きく）
+          LOOP_MINUTES: ${{ github.event.inputs.loop_minutes || '300' }} # 1回の見張り時間（分）
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }} # 無料AIのカギ(あれば最終確認に使う)
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }} # 有料AIのカギ(任意)
+        run: python scripts/monitor.py
+
+      - name: 見た商品リストを保存
+        if: always() # 途中で終わっても最後に保存を試みる
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add state
+          # 変化があった時だけ記録する
+          git commit -m "新着監視: 状態を更新 [skip ci]" || { echo "変更なし"; exit 0; }
+          git pull --rebase origin ${{ github.ref_name }} || true
+          git push || echo "push をスキップしました"
+
+      - name: 次の監視を自動で開始（PATがある時だけ）
+        if: success() # 正常に終わった時だけ（クラッシュ時の連続再起動を防ぐ）
+        env:
+          PAT: ${{ secrets.PAT_TOKEN }}
+        run: |
+          if [ -n "$PAT" ]; then
+            echo "次の監視を自動起動します"
+            curl -sS -X POST \
+              -H "Authorization: Bearer $PAT" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/${{ github.repository }}/actions/workflows/monitor.yml/dispatches" \
+              -d '{"ref":"${{ github.ref_name }}"}'
+          else
+            echo "PAT_TOKEN 未設定のため自動再起動はスキップ（cron/手動に依存）"
+          fi
+

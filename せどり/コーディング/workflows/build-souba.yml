@@ -1,0 +1,40 @@
+# メルカリ相場DBを「一度だけ」作る（手動実行）
+# 売却デザイン(sold_items.json)ごとの今のメルカリ相場を取得し、保存する。
+name: メルカリ相場DB作成
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-souba:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: リポジトリを取得
+        uses: actions/checkout@v4
+
+      - name: Pythonを準備
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 必要ライブラリを入れる
+        run: pip install pyjwt cryptography
+
+      - name: 相場DBを作成
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: python scripts/build_souba.py
+
+      - name: 結果を保存
+        if: always()
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add data/mercari_souba.json
+          git commit -m "メルカリ相場DBを更新 [skip ci]" || echo "変更なし"
+          git pull --rebase origin ${{ github.ref_name }} || true
+          git push || echo "push スキップ"
