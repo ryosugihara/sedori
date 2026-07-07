@@ -3,7 +3,9 @@
 name: 在庫スキャン(利益さがし)
 
 on:
-  workflow_dispatch: # 手動で実行する
+  schedule:
+    - cron: "30 3 * * *" # 毎日1回・03:30 UTC = 日本時間 12:30（メルカリ内スキャンの後）
+  workflow_dispatch: # 手動でも実行できる
     inputs:
       scan_max:
         description: "通知する最大件数（多すぎ防止）"

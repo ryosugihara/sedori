@@ -2,6 +2,8 @@
 name: メルカリ内スキャン
 
 on:
+  schedule:
+    - cron: "0 3 * * *" # 毎日1回・03:00 UTC = 日本時間 12:00
   workflow_dispatch:
     inputs:
       targets:
