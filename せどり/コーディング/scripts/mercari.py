@@ -55,8 +55,11 @@ def _make_dpop(url, method="POST"):
     return jwt.encode(payload, key, algorithm="ES256", headers=headers)
 
 
-def _search_body(keyword, page_size=120, status="STATUS_SOLD_OUT"):
-    """検索APIに送るデータ。status=売り切れ で実売相場を狙う。"""
+def _search_body(keyword, page_size=120, status="STATUS_SOLD_OUT", seller_ids=None):
+    """検索APIに送るデータ。status=売り切れ で実売相場を狙う。
+    seller_ids を渡すと、その出品者(たち)の商品だけに絞れる
+    （keyword="" と組み合わせると『その人の出品を全部』取得できる＝店の中身のぞき見）。
+    """
     return {
         "userId": "", "pageSize": page_size, "pageToken": "",
         "searchSessionId": uuid.uuid4().hex,
@@ -66,7 +69,8 @@ def _search_body(keyword, page_size=120, status="STATUS_SOLD_OUT"):
             "keyword": keyword, "excludeKeyword": "",
             "sort": "SORT_CREATED_TIME", "order": "ORDER_DESC",
             "status": [status],  # SOLD_OUT=売り切れ(相場用) / ON_SALE=販売中(仕入れ探し用)
-            "sizeId": [], "categoryId": [], "brandId": [], "sellerId": [],
+            "sizeId": [], "categoryId": [], "brandId": [],
+            "sellerId": [str(s) for s in (seller_ids or [])],
             "priceMin": 0, "priceMax": 0, "itemConditionId": [],
             "shippingPayerId": [], "shippingFromArea": [], "shippingMethod": [],
             "colorId": [], "hasCoupon": False, "attributes": [],
@@ -85,11 +89,12 @@ def _to_int(v):
         return None
 
 
-def fetch_sold(keyword, page_size=120, status="STATUS_SOLD_OUT"):
+def fetch_sold(keyword, page_size=120, status="STATUS_SOLD_OUT", seller_ids=None):
     """キーワードで商品を取得し、商品の辞書リストを返す（失敗時は空）。
     status を変えると「売り切れ(相場)」「販売中(仕入れ探し)」を切り替えられる。
+    seller_ids を渡すと、その出品者(たち)の商品だけに絞れる。
     """
-    body = json.dumps(_search_body(keyword, page_size, status)).encode("utf-8")
+    body = json.dumps(_search_body(keyword, page_size, status, seller_ids)).encode("utf-8")
     req = urllib.request.Request(API_URL, data=body, method="POST")
     req.add_header("Content-Type", "application/json")
     req.add_header("Accept", "*/*")
@@ -126,15 +131,16 @@ def fetch_sold(keyword, page_size=120, status="STATUS_SOLD_OUT"):
             "image": thumbs[0] if thumbs else "",          # 商品写真(サムネイル)のURL
             "thumbnails": thumbs,                           # 写真の一覧（精度測定に使う）
             "condition_id": it.get("itemConditionId"),      # 状態ランク(1=新品寄り〜6)
+            "seller_id": it.get("sellerId"),                # 出品者ID（同じ人の他の出品を辿るのに使う）
             # いつの取引か（updated=最終更新。売れた頃の時刻として使う）
             "updated": _to_int(it.get("updated")) or _to_int(it.get("created")),
         })
     return out
 
 
-def fetch_on_sale(keyword, page_size=120):
+def fetch_on_sale(keyword, page_size=120, seller_ids=None):
     """いま販売中の商品を取得する（メルカリ内で安い出品を探す用）"""
-    return fetch_sold(keyword, page_size, status="STATUS_ON_SALE")
+    return fetch_sold(keyword, page_size, status="STATUS_ON_SALE", seller_ids=seller_ids)
 
 
 ITEM_API = "https://api.mercari.jp/items/get"

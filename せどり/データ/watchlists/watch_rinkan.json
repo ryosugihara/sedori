@@ -89,6 +89,36 @@
       "name": "COACH",
       "keyword": "coach",
       "profit_only": true
+    },
+    {
+      "name": "EMPORIO ARMANI",
+      "keyword": "emporio armani",
+      "profit_only": true
+    },
+    {
+      "name": "ARMANI JEANS",
+      "keyword": "armani jeans",
+      "profit_only": true
+    },
+    {
+      "name": "CELINE",
+      "keyword": "celine",
+      "profit_only": true
+    },
+    {
+      "name": "LANVIN",
+      "keyword": "lanvin",
+      "profit_only": true
+    },
+    {
+      "name": "Ralph Lauren",
+      "keyword": "ralph lauren",
+      "profit_only": true
+    },
+    {
+      "name": "adidas",
+      "keyword": "adidas",
+      "profit_only": true
     }
   ]
 }

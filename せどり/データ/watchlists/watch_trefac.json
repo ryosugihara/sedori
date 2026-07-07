@@ -89,6 +89,36 @@
       "name": "COACH",
       "keyword": "OLD COACH",
       "profit_only": true
+    },
+    {
+      "name": "EMPORIO ARMANI",
+      "keyword": "EMPORIO ARMANI",
+      "profit_only": true
+    },
+    {
+      "name": "ARMANI JEANS",
+      "keyword": "ARMANI JEANS",
+      "profit_only": true
+    },
+    {
+      "name": "CELINE",
+      "keyword": "CELINE",
+      "profit_only": true
+    },
+    {
+      "name": "LANVIN",
+      "keyword": "LANVIN",
+      "profit_only": true
+    },
+    {
+      "name": "Ralph Lauren",
+      "keyword": "RALPH LAUREN",
+      "profit_only": true
+    },
+    {
+      "name": "adidas",
+      "keyword": "adidas",
+      "profit_only": true
     }
   ]
 }
