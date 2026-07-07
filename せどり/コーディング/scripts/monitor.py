@@ -670,8 +670,9 @@ def check_source(brands, seen, first_run, get_items, do_slow=True):
 
 
 def scan_profitable():
-    """②ブランド(profit_only)の『今ある在庫』を全部しらべて、利益が出そうな物を通知する。
-    新着かどうかは関係なく、今の出品の中から予想利益が通知ライン以上の商品を探す。
+    """監視中の全ブランドの『今ある在庫』を全部しらべて、利益が出そうな物を通知する。
+    ①(優先ブランド)か②(profit_only)かは関係なく、今の出品の中から
+    予想利益が通知ライン以上の商品を探す。
     （1回限りの『棚卸しスキャン』。state＝見た記録 はいじらない）
     """
     if not image_match_ready():
@@ -681,10 +682,14 @@ def scan_profitable():
     excludes = load_excludes()
     MAX_HITS = int(os.environ.get("SCAN_MAX", "30"))  # 通知しすぎ防止の上限
 
-    # ②ブランドを置いている3サイト（キーワード検索）を対象にする
+    # 監視している5サイト・全ブランドを対象にする（①②の区別なし）
     sources = [
+        (load_json_file(BRANDS_FILE, {"brands": []}).get("brands", []),
+         kindal_items, "KINDAL"),
         (load_json_file(TREFAC_BRANDS_FILE, {"brands": []}).get("brands", []),
          trefac.fetch_brand_items, "トレファク"),
+        (load_json_file(BRING_BRANDS_FILE, {"brands": []}).get("brands", []),
+         bring_items, "BRING"),
         (load_json_file(RINKAN_BRANDS_FILE, {"brands": []}).get("brands", []),
          rinkan.fetch_brand_items, "RINKAN"),
         (load_json_file(HARDOFF_BRANDS_FILE, {"brands": []}).get("brands", []),
@@ -695,12 +700,10 @@ def scan_profitable():
     seen_keys = set()  # 同じ商品を二重に拾わないための目印
     for brands, get_items, site in sources:
         for b in brands:
-            if not b.get("profit_only"):
-                continue  # ②ブランド（利益が出る時だけ通知）だけが対象
             try:
                 items = get_items(b)
             except Exception as e:
-                print(f"  取得失敗 ({site}/{b.get('keyword')}): {e}")
+                print(f"  取得失敗 ({site}/{b.get('name')}): {e}")
                 continue
             for it in items:
                 if is_excluded(it, excludes):
@@ -719,7 +722,7 @@ def scan_profitable():
                     continue
                 it["img_match"] = match
                 hits.append(it)
-            print(f"  {site}/{b.get('keyword')}: ここまで利益候補 {len(hits)} 件")
+            print(f"  {site}/{b.get('name')}: ここまで利益候補 {len(hits)} 件")
             time.sleep(REQUEST_WAIT)
 
     # 利益が大きい順に並べる（良い物から先に届くように）
@@ -728,7 +731,7 @@ def scan_profitable():
     print(f"利益が出そうな在庫: {total} 件")
 
     if total == 0:
-        send_text("🔎 在庫スキャン完了：今は利益が出そうな②ブランド商品は見つかりませんでした。")
+        send_text("🔎 在庫スキャン完了：今は利益が出そうな商品は見つかりませんでした。")
         return
 
     note = ""
@@ -736,7 +739,7 @@ def scan_profitable():
         note = f"（多いので利益の大きい上位{MAX_HITS}件だけ送ります）"
         hits = hits[:MAX_HITS]
     send_text(
-        f"🔎 在庫スキャン完了：利益が出そうな②ブランド商品を {total} 件みつけました{note}"
+        f"🔎 在庫スキャン完了：利益が出そうな商品を {total} 件みつけました{note}"
     )
     send_items(hits)
 
