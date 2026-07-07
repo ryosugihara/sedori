@@ -98,6 +98,15 @@ def main():
     if removed:
         con.commit()
         print(f"メルカリショップの混入 {removed} 件をDBから削除しました")
+    # 「〇〇様専用」等の予約出品（商品説明が実質なく、相場・画像の参考にならない）を消す。
+    # 短いタイトルに「専用」が入っている物だけを対象にする
+    # （長いタイトルは商品説明も書かれている実物出品なので残す）。
+    reserved = con.execute(
+        "DELETE FROM items WHERE name LIKE '%専用%' AND LENGTH(name) <= 15"
+    ).rowcount
+    if reserved:
+        con.commit()
+        print(f"予約出品（商品説明なし） {reserved} 件をDBから削除しました")
     # 相場は変動するので、古い取引（既定：半年より前）はDBから消す
     days = souba_days()
     cutoff = int(time.time()) - days * 86400
@@ -126,10 +135,11 @@ def main():
                         "UPDATE items SET updated=? WHERE id=? AND updated IS NULL",
                         (it["updated"], it["id"]),
                     )
-            # まだDBに無くて、かつ取引が新しい（半年以内）物だけを入れる
+            # まだDBに無くて、取引が新しく（半年以内）、予約出品でもない物だけを入れる
             fresh = [it for it in items
                      if it["id"] and it["id"] not in known
-                     and not (it.get("updated") and it["updated"] < cutoff)]
+                     and not (it.get("updated") and it["updated"] < cutoff)
+                     and not ("専用" in it.get("name", "") and len(it.get("name", "")) <= 15)]
             print(f"  「{kw}」 取得{len(items)}件 / 新規{len(fresh)}件")
 
             for it in fresh:
