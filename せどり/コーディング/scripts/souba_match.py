@@ -221,16 +221,15 @@ def match_item(item, souba):
 
         if verified is None:
             # ここに来るのは『似た系統』のまま裏付けが無い場合。
-            # 利益が出そうな時だけAIで最終確認する（柄物は昇格させず除外判定のみ）。
-            profitable = profit is not None and profit >= souba.get("notify_line", 2000)
-            if profitable:
-                v = ask_ai()
-                if v == "same":
-                    if not capped:
-                        rank = "同デザイン"
-                    verified = "AIが写真を見比べて確認"
-                elif v == "different" and capped:
-                    return None  # 柄物で明確に別物と判定されたので除外
+            # 利益が出るかどうかに関わらず、AI(Gemini)のカギがあれば必ず
+            # 見比べてもらう（柄物は昇格させず除外判定のみに使う）。
+            v = ask_ai()
+            if v == "same":
+                if not capped:
+                    rank = "同デザイン"
+                verified = "AIが写真を見比べて確認"
+            elif v == "different" and capped:
+                return None  # 柄物で明確に別物と判定されたので除外
             if verified is None:
                 return None  # 幾何検証にもAIにも裏付けが取れない実例は出さない
 
