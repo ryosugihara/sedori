@@ -21,9 +21,10 @@ import trefac
 import rinkan
 import hardoff
 
-# 1ブランドあたり何件ためすか／対象ブランド（環境変数で変えられる）
+# 1ブランドあたり何件ためすか／対象ブランド／送る件数（環境変数で変えられる）
 PER_BRAND = int(os.environ.get("DEMO_PER_BRAND", "12"))
 ONLY_BRANDS = [s.strip() for s in os.environ.get("DEMO_BRANDS", "").split(",") if s.strip()]
+TOP_N = int(os.environ.get("DEMO_TOP_N", "5"))
 REPORT_FILE = "せどり/データ/recon/DEMO_MATCH.txt"
 
 
@@ -63,9 +64,9 @@ def main():
                   f"累計候補 {len(candidates)} 件")
             time.sleep(monitor.REQUEST_WAIT)
 
-    # 似ている度が高い順に上位5件
+    # 似ている度が高い順に上位N件
     candidates.sort(key=lambda x: x["img_match"]["best_sim"], reverse=True)
-    top = candidates[:5]
+    top = candidates[:TOP_N]
 
     lines = [f"画像判定テスト  候補{len(candidates)}件から上位{len(top)}件", ""]
     for it in top:

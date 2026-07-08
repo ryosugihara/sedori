@@ -12,6 +12,10 @@ on:
         description: "1ブランドあたり調べる件数"
         default: "12"
         required: false
+      top_n:
+        description: "Discordに送る件数"
+        default: "5"
+        required: false
 
 permissions:
   contents: write
@@ -45,6 +49,7 @@ jobs:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           DEMO_BRANDS: ${{ github.event.inputs.brands }}
           DEMO_PER_BRAND: ${{ github.event.inputs.per_brand || '12' }}
+          DEMO_TOP_N: ${{ github.event.inputs.top_n || '5' }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }} # 無料AIのカギ(あれば最終確認に使う)
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }} # 有料AIのカギ(任意)
         run: python せどり/コーディング/scripts/demo_match.py
