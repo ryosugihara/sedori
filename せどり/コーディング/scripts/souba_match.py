@@ -212,6 +212,22 @@ def match_item(item, souba):
                 if v == "same":
                     rank = "同デザイン"
                     verified = "AIが写真を見比べて確認"
+        elif (rank == "似た系統" and capped
+                and profit is not None
+                and profit >= souba.get("notify_line", 2000)):
+            # GG柄等の柄物は同デザインには昇格させない（型番/サイズ違いを
+            # 写真で見分けられないため）。ただしCLIP/DINOだけの判定は
+            # 柄の強さに引っ張られて的外れな実例を拾いやすいので、
+            # AIに写真を見比べてもらい「違う」と言われたら候補ごと捨てる
+            # （見当違いな参考を通知しないための最終ガード）。
+            import verify_ai
+            if verify_ai.available():
+                v = verify_ai.same_product(item["image"], rs[i0][5],
+                                           item.get("title", ""), rs[i0][1] or "")
+                if v == "different":
+                    return None
+                if v == "same":
+                    verified = "AIが写真を見比べて確認（柄物のため同デザインへの昇格はせず）"
 
         r0 = rs[i0]  # 一番似ていた実例（通知で根拠として見せる）
         return {
