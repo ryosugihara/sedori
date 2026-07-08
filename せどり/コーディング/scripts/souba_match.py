@@ -179,55 +179,60 @@ def match_item(item, souba):
         buy = item.get("price_num")
         profit = (net - buy) if buy else None   # 予想利益（仕入値不明なら None）
 
-        # 『同デザイン』は答え合わせに合格した時だけ名乗れる（二重確認）:
+        # 通知する実例は必ず答え合わせに合格した物だけにする（二重確認）:
         #  1) 幾何検証（無料）… 細部の点が同じ位置関係で一致するか
         #  2) AI最終確認（カギがある時だけ）… AIが写真2枚を見比べて判定
+        # 『似た系統』も含め、どちらにも合格できなかった実例は参考表示すら
+        # しない（以前は『似た系統』がノーチェックで表示されており、
+        # CLIP/DINOの類似度だけで無関係な商品が参考に出ることがあった）。
+        import geom_verify
+        geo_th = int(souba.get("geo_inliers", 15))
+        raw_item = fingerprint.download_bytes(item["image"])
+        raw_ref = fingerprint.download_bytes(rs[i0][5]) if rs[i0][5] else None
+        inl = (geom_verify.inlier_count(raw_item, raw_ref)
+               if raw_item and raw_ref else 0)
+        # GG柄等の繰り返し柄は、幾何検証も似た特徴点だらけで誤って合格しやすい
+        # （geom_verify.py自身の注意書き通り）ため、幾何検証の結果は信用しない。
+        geo_ok = inl >= geo_th and not capped
+
+        ai_verdict = [None]  # AIには1回しか聞かない（レート制限・費用を節約）
+
+        def ask_ai():
+            if ai_verdict[0] is None:
+                import verify_ai
+                if verify_ai.available():
+                    ai_verdict[0] = verify_ai.same_product(
+                        item["image"], rs[i0][5],
+                        item.get("title", ""), rs[i0][1] or "") or "unsure"
+                else:
+                    ai_verdict[0] = "unsure"
+            return ai_verdict[0]
+
         verified = None
-        if rank == "同デザイン":
-            import geom_verify
-            import verify_ai
-            raw_item = fingerprint.download_bytes(item["image"])
-            raw_ref = fingerprint.download_bytes(rs[i0][5]) if rs[i0][5] else None
-            geo_th = int(souba.get("geo_inliers", 15))
-            inl = (geom_verify.inlier_count(raw_item, raw_ref)
-                   if raw_item and raw_ref else 0)
-            if inl >= geo_th:
-                verified = f"幾何検証OK({inl}点一致)"
-            elif verify_ai.available():
-                v = verify_ai.same_product(item["image"], rs[i0][5],
-                                           item.get("title", ""), rs[i0][1] or "")
+        if geo_ok:
+            verified = f"幾何検証OK({inl}点一致)"
+        elif rank == "同デザイン":
+            # 同デザイン候補は幾何検証に落ちても、AIのカギがあれば必ず確認する
+            if ask_ai() == "same":
+                verified = "AIが写真を見比べて確認"
+
+        if rank == "同デザイン" and not verified:
+            rank = "似た系統"  # 答え合わせに落ちたら断定しない
+
+        if verified is None:
+            # ここに来るのは『似た系統』のまま裏付けが無い場合。
+            # 利益が出そうな時だけAIで最終確認する（柄物は昇格させず除外判定のみ）。
+            profitable = profit is not None and profit >= souba.get("notify_line", 2000)
+            if profitable:
+                v = ask_ai()
                 if v == "same":
+                    if not capped:
+                        rank = "同デザイン"
                     verified = "AIが写真を見比べて確認"
-            if not verified:
-                rank = "似た系統"  # 答え合わせに落ちたら断定しない
-        elif (rank == "似た系統" and not capped
-                and profit is not None
-                and profit >= souba.get("notify_line", 2000)):
-            # 『利益が出そうな参考候補』は、AIに写真を見比べてもらい
-            # 「同じ」と言われたら同デザインに昇格させる（AIの目のフル活用）
-            import verify_ai
-            if verify_ai.available():
-                v = verify_ai.same_product(item["image"], rs[i0][5],
-                                           item.get("title", ""), rs[i0][1] or "")
-                if v == "same":
-                    rank = "同デザイン"
-                    verified = "AIが写真を見比べて確認"
-        elif (rank == "似た系統" and capped
-                and profit is not None
-                and profit >= souba.get("notify_line", 2000)):
-            # GG柄等の柄物は同デザインには昇格させない（型番/サイズ違いを
-            # 写真で見分けられないため）。ただしCLIP/DINOだけの判定は
-            # 柄の強さに引っ張られて的外れな実例を拾いやすいので、
-            # AIに写真を見比べてもらい「違う」と言われたら候補ごと捨てる
-            # （見当違いな参考を通知しないための最終ガード）。
-            import verify_ai
-            if verify_ai.available():
-                v = verify_ai.same_product(item["image"], rs[i0][5],
-                                           item.get("title", ""), rs[i0][1] or "")
-                if v == "different":
-                    return None
-                if v == "same":
-                    verified = "AIが写真を見比べて確認（柄物のため同デザインへの昇格はせず）"
+                elif v == "different" and capped:
+                    return None  # 柄物で明確に別物と判定されたので除外
+            if verified is None:
+                return None  # 幾何検証にもAIにも裏付けが取れない実例は出さない
 
         r0 = rs[i0]  # 一番似ていた実例（通知で根拠として見せる）
         return {
