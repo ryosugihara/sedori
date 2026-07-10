@@ -563,16 +563,25 @@ def load_excludes():
     )
 
 
-def is_excluded(item, excludes):
-    """この商品が『通知しない』条件に当てはまるか判定する"""
+def is_excluded(item, excludes, brand=None):
+    """この商品が『通知しない』条件に当てはまるか判定する。
+    brand を渡すと、ブランド別のNGキーワード/カテゴリ許可リストも見る。
+    """
     # 商品名と分類の両方をまとめて、小文字でチェックする
     text = (item.get("title", "") + " " + item.get("category", "")).lower()
     price = item.get("price_num") or 0
+    brand = brand or item.get("brand")
 
     # 1) NGキーワード（含まれていたら除外）
     for kw in excludes.get("ng_keywords", []):
         if kw.lower() in text:
             return True
+
+    # 1b) ブランド別NGキーワード（例: サンローランはテーラードジャケット除外）
+    if brand:
+        for kw in excludes.get("brand_ng_keywords", {}).get(brand, []):
+            if kw.lower() in text:
+                return True
 
     # 2) 価格条件（キーワードに合致 かつ price_min 以上 なら除外）
     for rule in excludes.get("price_rules", []):
@@ -580,6 +589,16 @@ def is_excluded(item, excludes):
         kws = rule.get("keywords", [])
         if price >= pmin and any(k.lower() in text for k in kws):
             return True
+
+    # 3) ブランド別カテゴリ許可リスト（例: サンローランのバッグは
+    #    リュック/バックパック以外は通知しない）
+    if brand:
+        allow_rule = excludes.get("brand_category_allowlist", {}).get(brand)
+        if allow_rule:
+            is_category = any(k.lower() in text for k in allow_rule.get("category_keywords", []))
+            is_allowed = any(k.lower() in text for k in allow_rule.get("allow_keywords", []))
+            if is_category and not is_allowed:
+                return True
 
     return False
 
