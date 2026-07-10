@@ -21,7 +21,7 @@ import mercari      # メルカリ検索の部品
 
 REPORT_FILE = "せどり/データ/recon/MERCARI_SCAN.txt"
 
-# (照合に使うブランド名, メルカリの検索キーワード)
+# SCAN_TARGETSも相場収集リストも無い時だけ使う最終フォールバック
 DEFAULT_TARGETS = [
     ("MIU MIU", "ミュウミュウ アーカイブ バッグ"),
     ("MIU MIU", "ミュウミュウ アーカイブ"),
@@ -31,18 +31,34 @@ DEFAULT_TARGETS = [
     ("GUCCI", "グッチ アーカイブ"),
 ]
 
+WATCH_MERCARI_FILE = "せどり/データ/watchlists/watch_mercari.json"
+
+
+def load_all_brand_targets():
+    """既定の対象：相場収集リスト(watch_mercari.json)の全ブランド・全キーワード。
+    以前は③ブランドだけの手打ちリストだったが、監視中の全ブランド(23種・
+    キーワード計90件超)を対象にすることでスキャンの網羅性を上げる。
+    """
+    data = monitor.load_json_file(WATCH_MERCARI_FILE, {"brands": []})
+    out = [(b.get("name", ""), kw)
+           for b in data.get("brands", [])
+           for kw in b.get("keywords", [])]
+    return out or DEFAULT_TARGETS
+
 
 def load_targets():
-    """環境変数 SCAN_TARGETS（「ブランド|キーワード」を改行区切り）があればそれを使う"""
+    """環境変数 SCAN_TARGETS（「ブランド|キーワード」を改行区切り）があればそれを使う。
+    無ければ監視中の全ブランドを対象にする。
+    """
     raw = os.environ.get("SCAN_TARGETS", "").strip()
     if not raw:
-        return DEFAULT_TARGETS
+        return load_all_brand_targets()
     out = []
     for line in raw.splitlines():
         if "|" in line:
             brand, kw = line.split("|", 1)
             out.append((brand.strip(), kw.strip()))
-    return out or DEFAULT_TARGETS
+    return out or load_all_brand_targets()
 
 
 def main():
