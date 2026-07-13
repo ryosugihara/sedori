@@ -21,6 +21,7 @@ import mercari      # メルカリ検索の部品
 
 REPORT_FILE = "せどり/データ/recon/MERCARI_SCAN.txt"
 SEEN_FILE = "せどり/データ/state/mercari_scan_seen.json"  # 送信済み商品の記録(重複通知防止)
+CHECKED_FILE = "せどり/データ/state/mercari_scan_checked.json"  # 調べたが利益無しだった商品と、調べた日時
 
 # SCAN_TARGETSも相場収集リストも無い時だけ使う最終フォールバック
 DEFAULT_TARGETS = [
@@ -69,6 +70,9 @@ def main():
     souba = monitor.load_souba()
     excludes = monitor.load_excludes()
     notified_before = set(monitor.load_json_file(SEEN_FILE, []))
+    checked_before = monitor.load_json_file(CHECKED_FILE, {})  # {id: 最後に調べた時刻}
+    now_ts = time.time()
+    checked_now = {}  # 今回あらたに「利益無し」と分かった物
 
     strict = []   # 同デザイン＋利益あり（本命）
     loose = []    # 似た系統＋利益あり（参考）
@@ -83,6 +87,11 @@ def main():
             if raw["id"] in seen:
                 continue
             seen.add(raw["id"])
+            if raw["id"] in notified_before:
+                continue  # 前回までのスキャンで既に送信済み
+            last_checked = checked_before.get(raw["id"])
+            if last_checked and now_ts - last_checked < monitor.RECHECK_SECONDS:
+                continue  # 30日以内に調べて利益無しだった商品はスキップ
             it = {
                 "id": raw["id"],
                 "brand": brand,
@@ -99,9 +108,8 @@ def main():
             m = souba_match.match_item(it, souba)
             checked += 1
             if not m or m["profit"] is None or m["profit"] < souba["notify_line"]:
+                checked_now[raw["id"]] = now_ts
                 continue
-            if raw["id"] in notified_before:
-                continue  # 前回までのスキャンで既に送信済み
             it["img_match"] = m
             if m["rank"] == "同デザイン":
                 strict.append(it)
@@ -121,6 +129,10 @@ def main():
     with open(REPORT_FILE, "w", encoding="utf-8") as f:
         f.write(report)
     print(report)
+
+    # 「調べたが利益無しだった」記録は、通知の有無に関わらず必ず保存する
+    checked_before.update(checked_now)
+    monitor.save_json_file(CHECKED_FILE, checked_before)
 
     sent = []
     if strict:

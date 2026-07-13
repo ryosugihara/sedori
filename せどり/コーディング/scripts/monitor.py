@@ -53,6 +53,8 @@ HARDOFF_BRANDS_FILE = "せどり/データ/watchlists/watch_hardoff.json"      #
 HARDOFF_STATE_FILE = "せどり/データ/state/hardoff_seen.json"  # おふもーる の「見た商品」記録
 
 SCAN_PROFIT_SEEN_FILE = "せどり/データ/state/scan_profit_seen.json"  # 在庫スキャンで送信済みの商品記録(重複通知防止)
+SCAN_PROFIT_CHECKED_FILE = "せどり/データ/state/scan_profit_checked.json"  # 調べたが利益無しだった商品と、調べた日時
+RECHECK_SECONDS = 30 * 86400  # 利益無しだった商品を再チェックするまでの間隔(30日)
 SOUBA_FILE = "せどり/データ/watchlists/souba.json"                    # メルカリで売れた値段の記録(利益判定に使う)
 EXCLUDE_FILE = "せどり/データ/watchlists/exclude.json"                # 通知から除外する条件
 SOLD_DB_FILE = "せどり/データ/data/sold/sold_items.json"   # 売却済み商品DB(画像から抽出した相場・Phase2で予測に使う)
@@ -706,6 +708,9 @@ def scan_profitable():
     excludes = load_excludes()
     MAX_HITS = int(os.environ.get("SCAN_MAX", "30"))  # 通知しすぎ防止の上限
     notified_before = set(load_json_file(SCAN_PROFIT_SEEN_FILE, []))
+    checked_before = load_json_file(SCAN_PROFIT_CHECKED_FILE, {})  # {key: 最後に調べた時刻}
+    now_ts = time.time()
+    checked_now = {}  # 今回あらたに「利益無し」と分かった物（末尾でchecked_beforeへ合流）
 
     # 監視している5サイト・全ブランドを対象にする（①②の区別なし）
     sources = [
@@ -740,6 +745,9 @@ def scan_profitable():
                 key = f"{dedup[0]}:{dedup[1]}"
                 if key in notified_before:
                     continue  # 前回までのスキャンで既に送信済み
+                last_checked = checked_before.get(key)
+                if last_checked and now_ts - last_checked < RECHECK_SECONDS:
+                    continue  # 30日以内に調べて利益無しだった商品はスキップ
                 # 商品写真をメルカリ相場DBと見比べる（画像の指紋で照合）
                 match = None
                 if it.get("image"):
@@ -747,6 +755,7 @@ def scan_profitable():
                 if (not match or match["rank"] != "同デザイン"
                         or match["profit"] is None
                         or match["profit"] < souba["notify_line"]):
+                    checked_now[key] = now_ts  # 今回調べて利益無しだった
                     continue
                 it["img_match"] = match
                 it["_seen_key"] = key
@@ -758,6 +767,10 @@ def scan_profitable():
     hits.sort(key=lambda x: x["img_match"]["profit"], reverse=True)
     total = len(hits)
     print(f"利益が出そうな在庫: {total} 件")
+
+    # 「調べたが利益無しだった」記録は、通知の有無に関わらず必ず保存する
+    checked_before.update(checked_now)
+    save_json_file(SCAN_PROFIT_CHECKED_FILE, checked_before)
 
     if total == 0:
         send_text("🔎 在庫スキャン完了：今は利益が出そうな商品は見つかりませんでした。")
