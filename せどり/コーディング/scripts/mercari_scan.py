@@ -63,6 +63,9 @@ def load_targets():
     return out or load_all_brand_targets()
 
 
+MAX_SENT = int(os.environ.get("SCAN_MAX", "20"))  # 通知しすぎ防止の上限
+
+
 def main():
     if not souba_match.ready():
         monitor.send_text("🛒 メルカリ内スキャン中止：相場DBかAIの準備が揃っていません。")
@@ -74,16 +77,25 @@ def main():
     now_ts = time.time()
     checked_now = {}  # 今回あらたに「利益無し」と分かった物
 
-    strict = []   # 同デザイン＋利益あり（本命）
-    loose = []    # 似た系統＋利益あり（参考）
+    # 全キーワードを調べ終えてからまとめて送信すると、100件近いキーワードの
+    # 走査に数時間かかるため、見つけた頃には売り切れてしまう。
+    # そのため『見つかり次第すぐ送信』する方式にする（利益順には並べられない）。
     seen = set()
     checked = 0
+    sent_count = 0
+    strict_n = 0
+    loose_n = 0
+    report_lines = []
 
     for brand, kw in load_targets():
+        if sent_count >= MAX_SENT:
+            break
         items = mercari.fetch_on_sale(kw)
         time.sleep(1.5)
         print(f"「{kw}」 販売中 {len(items)}件")
         for raw in items:
+            if sent_count >= MAX_SENT:
+                break
             if raw["id"] in seen:
                 continue
             seen.add(raw["id"])
@@ -110,55 +122,47 @@ def main():
             if not m or m["profit"] is None or m["profit"] < souba["notify_line"]:
                 checked_now[raw["id"]] = now_ts
                 continue
+            # 見つけたその場ですぐ送信し、記録も即保存する
+            # （まだ売り切れていないうちに知らせるため）
             it["img_match"] = m
             if m["rank"] == "同デザイン":
-                strict.append(it)
+                strict_n += 1
+                monitor.send_text(
+                    f"🛒 🟢 **同デザインの売却実例より安い出品**をみつけました"
+                    f"（予想利益 約¥{m['profit']:,}）"
+                )
             else:
-                loose.append(it)
+                loose_n += 1
+                monitor.send_text(
+                    "🛒 🟡 参考：**似た系統で利益が出そうな出品**をみつけました"
+                    f"（予想利益 約¥{m['profit']:,}・同じ商品と断定はできていません。"
+                    "カードの上下の写真を見比べて判断してください）"
+                )
+            monitor.send_items([it])
+            notified_before.add(raw["id"])
+            monitor.save_json_file(SEEN_FILE, sorted(notified_before))
+            report_lines.append(f"- [{m['rank']}] {it['title'][:40]} {it['price']} "
+                                 f"利益¥{m['profit']:,} {it['url']}")
+            sent_count += 1
 
-    strict.sort(key=lambda x: x["img_match"]["profit"], reverse=True)
-    loose.sort(key=lambda x: x["img_match"]["profit"], reverse=True)
-
-    lines = [f"メルカリ内スキャン  照合{checked}件 → 同デザイン{len(strict)}件 / 似た系統{len(loose)}件"]
-    for it in (strict + loose)[:10]:
-        m = it["img_match"]
-        lines.append(f"- [{m['rank']}] {it['title'][:40]} {it['price']} "
-                     f"利益¥{m['profit']:,} {it['url']}")
-    report = "\n".join(lines)
-    os.makedirs("せどり/データ/recon", exist_ok=True)
-    with open(REPORT_FILE, "w", encoding="utf-8") as f:
-        f.write(report)
-    print(report)
+    print(f"メルカリ内スキャン  照合{checked}件 → 同デザイン{strict_n}件 / 似た系統{loose_n}件")
 
     # 「調べたが利益無しだった」記録は、通知の有無に関わらず必ず保存する
     checked_before.update(checked_now)
     monitor.save_json_file(CHECKED_FILE, checked_before)
 
-    sent = []
-    if strict:
-        monitor.send_text(
-            f"🛒 メルカリ内スキャン結果：🟢 **同デザインの売却実例より安い出品**を "
-            f"{len(strict)} 件みつけました（利益2,000円以上のみ）"
-        )
-        monitor.send_items(strict[:10])
-        sent += strict[:10]
-    if loose:
-        monitor.send_text(
-            f"🟡 参考：**似た系統で利益が出そうな出品** 上位{min(len(loose), 10)}件"
-            "（同じ商品と断定はできていません。カードの上下の写真を見比べて判断してください）"
-        )
-        monitor.send_items(loose[:10])
-        sent += loose[:10]
-    if not strict and not loose:
+    report = (f"メルカリ内スキャン  照合{checked}件 → 同デザイン{strict_n}件 / 似た系統{loose_n}件\n"
+              + "\n".join(report_lines))
+    os.makedirs("せどり/データ/recon", exist_ok=True)
+    with open(REPORT_FILE, "w", encoding="utf-8") as f:
+        f.write(report)
+    print(report)
+
+    if sent_count == 0:
         monitor.send_text(
             f"🛒 メルカリ内スキャン結果：{checked}件を照合しましたが、"
             "利益が出そうな出品は今はありませんでした。"
         )
-
-    # 今回送信した分を「送信済み」として記録する（次回以降は重複通知しない）
-    if sent:
-        notified_before.update(it["id"] for it in sent)
-        monitor.save_json_file(SEEN_FILE, sorted(notified_before))
 
 
 if __name__ == "__main__":

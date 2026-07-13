@@ -727,16 +727,26 @@ def scan_profitable():
          hardoff.fetch_brand_items, "オフモール"),
     ]
 
-    hits = []
+    # 全ブランドを調べ終えてからまとめて送信すると、5サイト×全ブランドの
+    # 走査に数十分〜数時間かかるため、見つけた頃には売り切れてしまう。
+    # そのため『見つかり次第すぐ送信』する方式にする（利益順には並べられない）。
+    sent_count = 0
+    report_lines = []
     seen_keys = set()  # 同じ商品を二重に拾わないための目印
     for brands, get_items, site in sources:
+        if sent_count >= MAX_HITS:
+            break
         for b in brands:
+            if sent_count >= MAX_HITS:
+                break
             try:
                 items = get_items(b)
             except Exception as e:
                 print(f"  取得失敗 ({site}/{b.get('name')}): {e}")
                 continue
             for it in items:
+                if sent_count >= MAX_HITS:
+                    break
                 if is_excluded(it, excludes):
                     continue
                 dedup = (it.get("shop"), str(it.get("id")))
@@ -758,48 +768,38 @@ def scan_profitable():
                         or match["profit"] < souba["notify_line"]):
                     checked_now[key] = now_ts  # 今回調べて利益無しだった
                     continue
+                # 見つけたその場ですぐ送信し、記録も即保存する
+                # （まだ売り切れていないうちに知らせるため。途中で止まっても
+                # 　ここまでの送信・チェック記録は残る）
                 it["img_match"] = match
-                it["_seen_key"] = key
-                hits.append(it)
-            print(f"  {site}/{b.get('name')}: ここまで利益候補 {len(hits)} 件")
+                send_text(f"🔎 利益が出そうな商品をみつけました（予想利益 約¥{match['profit']:,}）")
+                send_items([it])
+                notified_before.add(key)
+                save_json_file(SCAN_PROFIT_SEEN_FILE, sorted(notified_before))
+                report_lines.append(
+                    f"- [{it.get('shop')}] {it['title'][:40]} 仕入{it['price']} "
+                    f"利益¥{match['profit']:,} {it['url']}"
+                )
+                sent_count += 1
+            print(f"  {site}/{b.get('name')}: ここまで送信 {sent_count} 件")
             time.sleep(REQUEST_WAIT)
 
-    # 利益が大きい順に並べる（良い物から先に届くように）
-    hits.sort(key=lambda x: x["img_match"]["profit"], reverse=True)
-    total = len(hits)
-    print(f"利益が出そうな在庫: {total} 件")
+    print(f"利益が出そうで送信した在庫: {sent_count} 件")
 
     # 「調べたが利益無しだった」記録は、通知の有無に関わらず必ず保存する
     checked_before.update(checked_now)
     save_json_file(SCAN_PROFIT_CHECKED_FILE, checked_before)
 
-    if total == 0:
-        send_text("🔎 在庫スキャン完了：今は利益が出そうな商品は見つかりませんでした。")
-        return
-
-    note = ""
-    if total > MAX_HITS:
-        note = f"（多いので利益の大きい上位{MAX_HITS}件だけ送ります）"
-        hits = hits[:MAX_HITS]
-    send_text(
-        f"🔎 在庫スキャン完了：利益が出そうな商品を {total} 件みつけました{note}"
-    )
-    send_items(hits)
-
     # 商品名・金額・リンクをファイルにも残す（Discordの通知履歴を遡らなくても
-    # あとで見返せるように。send_items後に来たDiscord障害等でも記録は残る）
-    lines = [f"在庫スキャン結果  {total}件"]
-    for it in hits:
-        m = it["img_match"]
-        lines.append(f"- [{it.get('shop')}] {it['title'][:40]} 仕入{it['price']} "
-                     f"利益¥{m['profit']:,} {it['url']}")
+    # あとで見返せるように）
     os.makedirs("せどり/データ/recon", exist_ok=True)
     with open(SCAN_PROFIT_REPORT_FILE, "w", encoding="utf-8") as f:
-        f.write("\n".join(lines))
+        f.write(f"在庫スキャン結果  {sent_count}件\n" + "\n".join(report_lines))
 
-    # 今回送信した分を「送信済み」として記録する（次回以降は重複通知しない）
-    notified_before.update(it["_seen_key"] for it in hits)
-    save_json_file(SCAN_PROFIT_SEEN_FILE, sorted(notified_before))
+    if sent_count == 0:
+        send_text("🔎 在庫スキャン完了：今は利益が出そうな商品は見つかりませんでした。")
+    else:
+        send_text(f"🔎 在庫スキャン完了：利益が出そうな商品を {sent_count} 件みつけて送信しました。")
 
 
 def main():
