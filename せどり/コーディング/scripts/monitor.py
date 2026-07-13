@@ -53,10 +53,8 @@ HARDOFF_BRANDS_FILE = "せどり/データ/watchlists/watch_hardoff.json"      #
 HARDOFF_STATE_FILE = "せどり/データ/state/hardoff_seen.json"  # おふもーる の「見た商品」記録
 
 SCAN_PROFIT_SEEN_FILE = "せどり/データ/state/scan_profit_seen.json"  # 在庫スキャンで送信済みの商品記録(重複通知防止)
-SCAN_PROFIT_CHECKED_FILE = "せどり/データ/state/scan_profit_checked.json"  # 調べたが利益無しだった商品と、調べた日時
 SCAN_PROFIT_REPORT_FILE = "せどり/データ/recon/SCAN_PROFIT.txt"  # 送信した商品名・金額・リンクの記録(あとで見返す用)
 SCAN_PROFIT_STATS_FILE = "せどり/データ/recon/SCAN_PROFIT_STATS.txt"  # 「なぜ通知に至らなかったか」の診断レポート
-RECHECK_SECONDS = 30 * 86400  # 利益無しだった商品を再チェックするまでの間隔(30日)
 SOUBA_FILE = "せどり/データ/watchlists/souba.json"                    # メルカリで売れた値段の記録(利益判定に使う)
 EXCLUDE_FILE = "せどり/データ/watchlists/exclude.json"                # 通知から除外する条件
 SOLD_DB_FILE = "せどり/データ/data/sold/sold_items.json"   # 売却済み商品DB(画像から抽出した相場・Phase2で予測に使う)
@@ -753,9 +751,6 @@ def scan_profitable():
     excludes = load_excludes()
     MAX_HITS = int(os.environ.get("SCAN_MAX", "30"))  # 通知しすぎ防止の上限
     notified_before = set(load_json_file(SCAN_PROFIT_SEEN_FILE, []))
-    checked_before = load_json_file(SCAN_PROFIT_CHECKED_FILE, {})  # {key: 最後に調べた時刻}
-    now_ts = time.time()
-    checked_now = {}  # 今回あらたに「利益無し」と分かった物（末尾でchecked_beforeへ合流）
     stats = {}  # 診断レポート用の集計（match_item内部で加算される）
     examined = 0  # is_excluded等を通過し、実際に画像照合まで進んだ件数
     total_fetched = 0  # 各サイトから取得した商品の総数（除外・重複含む）
@@ -804,9 +799,6 @@ def scan_profitable():
                 key = f"{dedup[0]}:{dedup[1]}"
                 if key in notified_before:
                     continue  # 前回までのスキャンで既に送信済み
-                last_checked = checked_before.get(key)
-                if last_checked and now_ts - last_checked < RECHECK_SECONDS:
-                    continue  # 30日以内に調べて利益無しだった商品はスキップ
                 # 商品写真をメルカリ相場DBと見比べる（画像の指紋で照合）
                 examined += 1
                 match = None
@@ -815,7 +807,6 @@ def scan_profitable():
                 if (not match or match["rank"] != "同デザイン"
                         or match["profit"] is None
                         or match["profit"] < souba["notify_line"]):
-                    checked_now[key] = now_ts  # 今回調べて利益無しだった
                     continue
                 # 見つけたその場ですぐ送信し、記録も即保存する
                 # （まだ売り切れていないうちに知らせるため。途中で止まっても
@@ -834,10 +825,6 @@ def scan_profitable():
             time.sleep(REQUEST_WAIT)
 
     print(f"利益が出そうで送信した在庫: {sent_count} 件")
-
-    # 「調べたが利益無しだった」記録は、通知の有無に関わらず必ず保存する
-    checked_before.update(checked_now)
-    save_json_file(SCAN_PROFIT_CHECKED_FILE, checked_before)
 
     # 商品名・金額・リンクをファイルにも残す（Discordの通知履歴を遡らなくても
     # あとで見返せるように）

@@ -53,7 +53,7 @@ jobs:
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@users.noreply.github.com"
-          git add せどり/データ/state/scan_profit_seen.json せどり/データ/state/scan_profit_checked.json せどり/データ/recon/SCAN_PROFIT.txt
-          git commit -m "在庫スキャン: 送信済み・チェック済み記録を更新 [skip ci]" || echo "変更なし"
+          git add せどり/データ/state/scan_profit_seen.json せどり/データ/recon
+          git commit -m "在庫スキャン: 送信済み記録を更新 [skip ci]" || echo "変更なし"
           git pull --rebase origin ${{ github.ref_name }} || true
           git push || echo "push スキップ"
