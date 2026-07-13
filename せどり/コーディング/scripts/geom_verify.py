@@ -29,6 +29,39 @@ def _load_gray(raw, max_side=640):
     return img
 
 
+def dominant_color(raw, size=32):
+    """画像の代表色をLab色空間で返す（中心60%だけを見て、背景の影響を減らす）"""
+    import numpy as np
+    import cv2
+    arr = np.frombuffer(raw, dtype=np.uint8)
+    img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+    if img is None:
+        return None
+    img = cv2.resize(img, (size, size))
+    lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB).astype("float32")
+    m = int(size * 0.2)
+    center = lab[m:size - m, m:size - m]
+    return center.reshape(-1, 3).mean(axis=0)
+
+
+def color_distance(raw_a, raw_b):
+    """2枚の画像の代表色の違い(Lab色空間の距離。大きいほど色が違う＝None=判定不能)。
+    幾何検証(ORB)は白黒画像で特徴点を探すため色の違いを一切見ておらず、
+    ステッチ等の模様が似ているだけの色違い商品を誤って合格させることがある。
+    そのため色だけは別途ここで比較する。
+    """
+    try:
+        import numpy as np
+        ca = dominant_color(raw_a)
+        cb = dominant_color(raw_b)
+        if ca is None or cb is None:
+            return None
+        return float(np.linalg.norm(ca - cb))
+    except Exception as e:
+        print(f"  色比較に失敗: {e}")
+        return None
+
+
 def inlier_count(raw_a, raw_b):
     """2枚の画像の『幾何学的に一致する点の数』を返す（多い=同じ商品の可能性大）"""
     try:

@@ -258,6 +258,8 @@ def load_souba():
         "plain_patterns": s.get("画像判定_断定しない柄", []),
         # 同デザイン断定に必要な幾何検証の一致点数（答え合わせの合格ライン）
         "geo_inliers": s.get("画像判定_幾何一致点数", 15),
+        # 色の違い(Lab色空間の距離)がこれを超えたら別物として除外する
+        "color_distance_th": s.get("画像判定_色距離", 30),
         "records": data.get("records", []),
     }
 

@@ -189,6 +189,17 @@ def match_item(item, souba):
         geo_th = int(souba.get("geo_inliers", 15))
         raw_item = fingerprint.download_bytes(item["image"])
         raw_ref = fingerprint.download_bytes(rs[i0][5]) if rs[i0][5] else None
+
+        # 幾何検証(ORB)は白黒画像で処理するため色を一切見ておらず、ステッチや
+        # シルエットが似ているだけの色違い商品(黒デニム×紺デニム等)を誤って
+        # 合格させることがある。色が明らかに違う場合は、幾何検証やAIを試す
+        # までもなく別物として扱う。
+        color_th = float(souba.get("color_distance_th", 30))
+        if raw_item and raw_ref:
+            color_dist = geom_verify.color_distance(raw_item, raw_ref)
+            if color_dist is not None and color_dist > color_th:
+                return None
+
         inl = (geom_verify.inlier_count(raw_item, raw_ref)
                if raw_item and raw_ref else 0)
         # GG柄等の繰り返し柄は、幾何検証も似た特徴点だらけで誤って合格しやすい
