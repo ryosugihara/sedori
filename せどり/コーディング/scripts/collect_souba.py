@@ -28,6 +28,7 @@ DB_FILE = "せどり/データ/data/souba_db.sqlite"
 CONF_FILE = "せどり/データ/watchlists/watch_mercari.json"
 REQUEST_WAIT = 1.5   # メルカリ検索の間隔（秒）
 IMG_WAIT = 0.1       # 画像ダウンロードの間隔（画像は配信サーバーなので短くてOK）
+SOLD_PAGES = 3       # 1キーワードにつき何ページ分集めるか（1ページ最大120件＝既定で最大約3倍集める）
 
 # 状態ランク番号 → 日本語（メルカリの決まり）
 CONDITIONS = {1: "新品、未使用", 2: "未使用に近い", 3: "目立った傷や汚れなし",
@@ -126,7 +127,7 @@ def main():
 
     for b in brands:
         for kw in b.get("keywords", []):
-            items = mercari.fetch_sold(kw)
+            items = mercari.fetch_sold(kw, max_pages=SOLD_PAGES)
             time.sleep(REQUEST_WAIT)
             # すでにDBにある商品には「いつの取引か」だけ書き込む（まだ無い行だけ）
             for it in items:

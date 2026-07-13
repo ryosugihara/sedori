@@ -55,13 +55,14 @@ def _make_dpop(url, method="POST"):
     return jwt.encode(payload, key, algorithm="ES256", headers=headers)
 
 
-def _search_body(keyword, page_size=120, status="STATUS_SOLD_OUT", seller_ids=None):
+def _search_body(keyword, page_size=120, status="STATUS_SOLD_OUT", seller_ids=None, page_token=""):
     """検索APIに送るデータ。status=売り切れ で実売相場を狙う。
     seller_ids を渡すと、その出品者(たち)の商品だけに絞れる
     （keyword="" と組み合わせると『その人の出品を全部』取得できる＝店の中身のぞき見）。
+    page_token を渡すと「続きのページ」を取得できる（fetch_soldのmax_pages参照）。
     """
     return {
-        "userId": "", "pageSize": page_size, "pageToken": "",
+        "userId": "", "pageSize": page_size, "pageToken": page_token,
         "searchSessionId": uuid.uuid4().hex,
         "indexRouting": "INDEX_ROUTING_UNSPECIFIED",
         "thumbnailTypes": [],
@@ -89,24 +90,18 @@ def _to_int(v):
         return None
 
 
-def fetch_sold(keyword, page_size=120, status="STATUS_SOLD_OUT", seller_ids=None):
-    """キーワードで商品を取得し、商品の辞書リストを返す（失敗時は空）。
-    status を変えると「売り切れ(相場)」「販売中(仕入れ探し)」を切り替えられる。
-    seller_ids を渡すと、その出品者(たち)の商品だけに絞れる。
-    """
-    body = json.dumps(_search_body(keyword, page_size, status, seller_ids)).encode("utf-8")
+def _fetch_page(keyword, page_size, status, seller_ids, page_token):
+    """検索APIを1ページ分だけ呼ぶ（内部用）。(商品リスト, 次ページtoken) を返す。"""
+    body = json.dumps(_search_body(keyword, page_size, status, seller_ids, page_token)).encode("utf-8")
     req = urllib.request.Request(API_URL, data=body, method="POST")
     req.add_header("Content-Type", "application/json")
     req.add_header("Accept", "*/*")
     req.add_header("X-Platform", "web")
     req.add_header("DPoP", _make_dpop(API_URL, "POST"))
     req.add_header("User-Agent", UA)
-    try:
-        with urllib.request.urlopen(req, timeout=30) as res:
-            data = json.loads(res.read().decode("utf-8"))
-    except Exception as e:
-        print(f"  メルカリ取得失敗 ({keyword}): {e}")
-        return []
+    with urllib.request.urlopen(req, timeout=30) as res:
+        data = json.loads(res.read().decode("utf-8"))
+
     out = []
     for it in data.get("items", []):
         # メルカリショップ（業者の店）は除外する。
@@ -135,12 +130,38 @@ def fetch_sold(keyword, page_size=120, status="STATUS_SOLD_OUT", seller_ids=None
             # いつの取引か（updated=最終更新。売れた頃の時刻として使う）
             "updated": _to_int(it.get("updated")) or _to_int(it.get("created")),
         })
+    next_token = (data.get("meta") or {}).get("nextPageToken", "")
+    return out, next_token
+
+
+def fetch_sold(keyword, page_size=120, status="STATUS_SOLD_OUT", seller_ids=None, max_pages=1):
+    """キーワードで商品を取得し、商品の辞書リストを返す（失敗時は空）。
+    status を変えると「売り切れ(相場)」「販売中(仕入れ探し)」を切り替えられる。
+    seller_ids を渡すと、その出品者(たち)の商品だけに絞れる。
+    max_pages を2以上にすると、続きのページも追加で取得する
+    （例: max_pages=3で最大およそ3倍の件数を集められる。
+    　ページ間は0.5秒あけてメルカリに優しくする）。
+    """
+    out = []
+    page_token = ""
+    for i in range(max(1, max_pages)):
+        try:
+            items, page_token = _fetch_page(keyword, page_size, status, seller_ids, page_token)
+        except Exception as e:
+            print(f"  メルカリ取得失敗 ({keyword}, {i + 1}ページ目): {e}")
+            break
+        out.extend(items)
+        if not items or not page_token:
+            break  # もう続きが無い
+        if i + 1 < max_pages:
+            time.sleep(0.5)
     return out
 
 
-def fetch_on_sale(keyword, page_size=120, seller_ids=None):
+def fetch_on_sale(keyword, page_size=120, seller_ids=None, max_pages=1):
     """いま販売中の商品を取得する（メルカリ内で安い出品を探す用）"""
-    return fetch_sold(keyword, page_size, status="STATUS_ON_SALE", seller_ids=seller_ids)
+    return fetch_sold(keyword, page_size, status="STATUS_ON_SALE",
+                       seller_ids=seller_ids, max_pages=max_pages)
 
 
 ITEM_API = "https://api.mercari.jp/items/get"
