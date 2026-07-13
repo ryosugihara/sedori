@@ -55,6 +55,7 @@ HARDOFF_STATE_FILE = "せどり/データ/state/hardoff_seen.json"  # おふも�
 SCAN_PROFIT_SEEN_FILE = "せどり/データ/state/scan_profit_seen.json"  # 在庫スキャンで送信済みの商品記録(重複通知防止)
 SCAN_PROFIT_CHECKED_FILE = "せどり/データ/state/scan_profit_checked.json"  # 調べたが利益無しだった商品と、調べた日時
 SCAN_PROFIT_REPORT_FILE = "せどり/データ/recon/SCAN_PROFIT.txt"  # 送信した商品名・金額・リンクの記録(あとで見返す用)
+SCAN_PROFIT_STATS_FILE = "せどり/データ/recon/SCAN_PROFIT_STATS.txt"  # 「なぜ通知に至らなかったか」の診断レポート
 RECHECK_SECONDS = 30 * 86400  # 利益無しだった商品を再チェックするまでの間隔(30日)
 SOUBA_FILE = "せどり/データ/watchlists/souba.json"                    # メルカリで売れた値段の記録(利益判定に使う)
 EXCLUDE_FILE = "せどり/データ/watchlists/exclude.json"                # 通知から除外する条件
@@ -694,6 +695,49 @@ def check_source(brands, seen, first_run, get_items, do_slow=True):
     return new_items
 
 
+def write_scan_diagnostics(path, total_fetched, examined, stats, sent_count):
+    """『なぜ通知に至らなかったか』の内訳をファイルに書き出す（診断用）。
+    stats は souba_match.match_item(..., stats=stats) で集計した辞書。
+    """
+    similar_found = stats.get("similar_found", 0)
+    sim90 = stats.get("sim_90plus", 0)
+    profit_neg = stats.get("profit_negative", 0)
+    profit_low = stats.get("profit_low", 0)
+    profit_ok = stats.get("profit_ok", 0)
+
+    reason_low_sim = sum(v for k, v in stats.items() if k.startswith("reason_類似度不足"))
+    reason_no_data = stats.get("reason_相場データ不足", 0)
+    reason_low_profit = profit_neg + profit_low
+    reason_other = (sum(v for k, v in stats.items() if k.startswith("reason_その他"))
+                     + max(0, total_fetched - examined))
+
+    ranking = sorted(
+        [("類似度不足", reason_low_sim), ("相場データ不足", reason_no_data),
+         ("利益不足", reason_low_profit), ("その他", reason_other)],
+        key=lambda x: -x[1],
+    )
+
+    lines = [
+        "📊 スキャン診断レポート",
+        f"1. 監視した総商品数: {total_fetched} 件（うち画像照合まで進んだ: {examined} 件）",
+        f"2. 類似商品が見つかった件数: {similar_found} 件",
+        f"3. 類似度(DINO)90%以上だった件数: {sim90} 件",
+        f"4. 利益がマイナスだった件数: {profit_neg} 件",
+        f"5. 利益0〜通知ライン未満だった件数: {profit_low} 件",
+        f"6. 利益が通知ライン以上だった件数: {profit_ok} 件（送信: {sent_count} 件）",
+        "7. 通知対象にならなかった理由ランキング:",
+    ]
+    for i, (name, n) in enumerate(ranking, start=1):
+        lines.append(f"   {i}位 {name}: {n} 件")
+
+    report = "\n".join(lines)
+    os.makedirs("せどり/データ/recon", exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(report)
+    print(report)
+    return report
+
+
 def scan_profitable():
     """監視中の全ブランドの『今ある在庫』を全部しらべて、利益が出そうな物を通知する。
     ①(優先ブランド)か②(profit_only)かは関係なく、今の出品の中から
@@ -712,6 +756,9 @@ def scan_profitable():
     checked_before = load_json_file(SCAN_PROFIT_CHECKED_FILE, {})  # {key: 最後に調べた時刻}
     now_ts = time.time()
     checked_now = {}  # 今回あらたに「利益無し」と分かった物（末尾でchecked_beforeへ合流）
+    stats = {}  # 診断レポート用の集計（match_item内部で加算される）
+    examined = 0  # is_excluded等を通過し、実際に画像照合まで進んだ件数
+    total_fetched = 0  # 各サイトから取得した商品の総数（除外・重複含む）
 
     # 監視している5サイト・全ブランドを対象にする（①②の区別なし）
     sources = [
@@ -745,6 +792,7 @@ def scan_profitable():
                 print(f"  取得失敗 ({site}/{b.get('name')}): {e}")
                 continue
             for it in items:
+                total_fetched += 1
                 if sent_count >= MAX_HITS:
                     break
                 if is_excluded(it, excludes):
@@ -760,9 +808,10 @@ def scan_profitable():
                 if last_checked and now_ts - last_checked < RECHECK_SECONDS:
                     continue  # 30日以内に調べて利益無しだった商品はスキップ
                 # 商品写真をメルカリ相場DBと見比べる（画像の指紋で照合）
+                examined += 1
                 match = None
                 if it.get("image"):
-                    match = souba_match.match_item(it, souba)
+                    match = souba_match.match_item(it, souba, stats=stats)
                 if (not match or match["rank"] != "同デザイン"
                         or match["profit"] is None
                         or match["profit"] < souba["notify_line"]):
@@ -796,8 +845,11 @@ def scan_profitable():
     with open(SCAN_PROFIT_REPORT_FILE, "w", encoding="utf-8") as f:
         f.write(f"在庫スキャン結果  {sent_count}件\n" + "\n".join(report_lines))
 
+    diag = write_scan_diagnostics(SCAN_PROFIT_STATS_FILE, total_fetched, examined, stats, sent_count)
+
     if sent_count == 0:
         send_text("🔎 在庫スキャン完了：今は利益が出そうな商品は見つかりませんでした。")
+        send_text(diag)
     else:
         send_text(f"🔎 在庫スキャン完了：利益が出そうな商品を {sent_count} 件みつけて送信しました。")
 

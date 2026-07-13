@@ -94,13 +94,21 @@ def _load():
     print(f"  相場DB読み込み: {total}件 / {len(_cache['brands'])}ブランド")
 
 
-def match_item(item, souba):
+def match_item(item, souba, stats=None):
     """新着商品(item)の写真をDBと照合する。一致が無い/失敗なら None。
 
     souba には手数料・送料・しきい値が入っている（monitor.load_souba()の返り値）。
+    stats に辞書を渡すと、どこで弾かれたか・類似度・利益の分布を集計する
+    （诊断レポート用。個数を数えるだけで判定そのものには影響しない）。
     """
+    def _count(key):
+        if stats is not None:
+            stats[key] = stats.get(key, 0) + 1
+
     try:
+        _count("total")
         if not item.get("image"):
+            _count("reason_その他_写真なし")
             return None  # 写真が無い商品は画像では判定できない
 
         text = (item.get("title", "") + " " + item.get("category", "")).lower()
@@ -110,12 +118,14 @@ def match_item(item, souba):
         plain = any(k.lower() in text for k in souba.get("plain_cats", []))
         has_feature = any(w.lower() in text for w in souba.get("feature_words", []))
         if plain and not has_feature:
+            _count("reason_その他_無地カテゴリ")
             return None
 
         _load()
         bn = _norm_brand(item.get("brand", ""))
         got = _cache["brands"].get(bn)
         if not got:
+            _count("reason_相場データ不足")
             return None  # このブランドの売却実例がまだDBに無い
 
         # 属性キーワード（例:コーティング）は『商品名に書いてあるか』が
@@ -132,6 +142,7 @@ def match_item(item, souba):
         # 1回のダウンロードで、CLIPとDINOの2種類の指紋を作る
         vec_c, vec_d = fingerprint.embed_image_url_both(item["image"])
         if vec_c is None or vec_d is None:
+            _count("reason_その他_画像取得失敗")
             return None
 
         mat_c, mat_d, rs = got
@@ -150,13 +161,17 @@ def match_item(item, souba):
         # さらに属性キーワード（コーティング等）の食い違う実例を外す
         idx = [i for i in idx if attrs_ok(rs[i][1])]
         if len(idx) == 0:
+            _count("reason_類似度不足")
             return None
         # 同一商品の判定が得意なDINOの点数が高い順に、最大5件
         idx = np.array(idx)
         picked = list(idx[np.argsort(-sims_d[idx])][:5])
+        _count("similar_found")  # 類似商品が見つかった件数
 
         i0 = picked[0]
         best_c, best_d = float(sims_c[i0]), float(sims_d[i0])
+        if best_d >= 0.90:
+            _count("sim_90plus")  # 類似度(DINO)90%以上だった件数
         rank = ("同デザイン" if (best_c >= strong_c and best_d >= strong_d)
                 else "似た系統")
 
@@ -178,6 +193,14 @@ def match_item(item, souba):
         net = int(estimate * (1 - fee) - ship)  # メルカリ手取り
         buy = item.get("price_num")
         profit = (net - buy) if buy else None   # 予想利益（仕入値不明なら None）
+        if profit is not None:
+            notify_line = souba.get("notify_line", 2000)
+            if profit < 0:
+                _count("profit_negative")      # 利益がマイナスだった件数
+            elif profit < notify_line:
+                _count("profit_low")           # 利益0〜通知ライン未満だった件数
+            else:
+                _count("profit_ok")            # 利益が通知ライン以上だった件数
 
         # 通知する実例は必ず答え合わせに合格した物だけにする（二重確認）:
         #  1) 幾何検証（無料）… 細部の点が同じ位置関係で一致するか
@@ -198,6 +221,7 @@ def match_item(item, souba):
         if raw_item and raw_ref:
             color_dist = geom_verify.color_distance(raw_item, raw_ref)
             if color_dist is not None and color_dist > color_th:
+                _count("reason_類似度不足_色違い")
                 return None
 
         inl = (geom_verify.inlier_count(raw_item, raw_ref)
@@ -240,10 +264,13 @@ def match_item(item, souba):
                     rank = "同デザイン"
                 verified = "AIが写真を見比べて確認"
             elif v == "different" and capped:
+                _count("reason_類似度不足_柄物別物判定")
                 return None  # 柄物で明確に別物と判定されたので除外
             if verified is None:
+                _count("reason_類似度不足_未確認")
                 return None  # 幾何検証にもAIにも裏付けが取れない実例は出さない
 
+        _count("matched")  # 幾何検証かAIで裏付けが取れた（=返り値を返す）件数
         r0 = rs[i0]  # 一番似ていた実例（通知で根拠として見せる）
         return {
             "rank": rank,

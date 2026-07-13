@@ -22,6 +22,7 @@ import mercari      # メルカリ検索の部品
 REPORT_FILE = "せどり/データ/recon/MERCARI_SCAN.txt"
 SEEN_FILE = "せどり/データ/state/mercari_scan_seen.json"  # 送信済み商品の記録(重複通知防止)
 CHECKED_FILE = "せどり/データ/state/mercari_scan_checked.json"  # 調べたが利益無しだった商品と、調べた日時
+STATS_FILE = "せどり/データ/recon/MERCARI_SCAN_STATS.txt"  # 「なぜ通知に至らなかったか」の診断レポート
 
 # SCAN_TARGETSも相場収集リストも無い時だけ使う最終フォールバック
 DEFAULT_TARGETS = [
@@ -76,6 +77,8 @@ def main():
     checked_before = monitor.load_json_file(CHECKED_FILE, {})  # {id: 最後に調べた時刻}
     now_ts = time.time()
     checked_now = {}  # 今回あらたに「利益無し」と分かった物
+    stats = {}  # 診断レポート用の集計（match_item内部で加算される）
+    total_fetched = 0  # 各キーワードで取得した商品の総数（除外・重複含む）
 
     # 全キーワードを調べ終えてからまとめて送信すると、100件近いキーワードの
     # 走査に数時間かかるため、見つけた頃には売り切れてしまう。
@@ -94,6 +97,7 @@ def main():
         time.sleep(1.5)
         print(f"「{kw}」 販売中 {len(items)}件")
         for raw in items:
+            total_fetched += 1
             if sent_count >= MAX_SENT:
                 break
             if raw["id"] in seen:
@@ -117,7 +121,7 @@ def main():
             }
             if monitor.is_excluded(it, excludes):
                 continue
-            m = souba_match.match_item(it, souba)
+            m = souba_match.match_item(it, souba, stats=stats)
             checked += 1
             if not m or m["profit"] is None or m["profit"] < souba["notify_line"]:
                 checked_now[raw["id"]] = now_ts
@@ -158,11 +162,14 @@ def main():
         f.write(report)
     print(report)
 
+    diag = monitor.write_scan_diagnostics(STATS_FILE, total_fetched, checked, stats, sent_count)
+
     if sent_count == 0:
         monitor.send_text(
             f"🛒 メルカリ内スキャン結果：{checked}件を照合しましたが、"
             "利益が出そうな出品は今はありませんでした。"
         )
+        monitor.send_text(diag)
 
 
 if __name__ == "__main__":
