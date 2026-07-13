@@ -28,7 +28,8 @@ DB_FILE = "せどり/データ/data/souba_db.sqlite"
 CONF_FILE = "せどり/データ/watchlists/watch_mercari.json"
 REQUEST_WAIT = 1.5   # メルカリ検索の間隔（秒）
 IMG_WAIT = 0.1       # 画像ダウンロードの間隔（画像は配信サーバーなので短くてOK）
-SOLD_PAGES = 3       # 1キーワードにつき何ページ分集めるか（1ページ最大120件＝既定で最大約3倍集める）
+PAGE_SIZE = 120      # 1ページの件数（メルカリの実質上限）
+MAX_PAGES = 25       # 安全のための上限（1キーワード最大 約3000件。暴走防止）
 
 # 状態ランク番号 → 日本語（メルカリの決まり）
 CONDITIONS = {1: "新品、未使用", 2: "未使用に近い", 3: "目立った傷や汚れなし",
@@ -71,6 +72,36 @@ def souba_days():
             return int(json.load(f).get("設定", {}).get("相場参照期間_日", 183))
     except Exception:
         return 183
+
+
+def fetch_sold_until_cutoff(keyword, cutoff):
+    """『相場参照期間より古い商品が出てくるまで』ページを取り続ける。
+    以前は固定3ページ(最大約360件)で打ち切っていたため、あまり売れない
+    (＝人気で無い)キーワードでは参照期間(既定183日)分に達する前に
+    打ち切ってしまい、逆によく売れるキーワードは6ヶ月分を取りきれて
+    いなかった。キーワードごとの売れ行きに合わせて可変にする。
+    """
+    out = []
+    page_token = ""
+    for i in range(MAX_PAGES):
+        try:
+            items, page_token = mercari.fetch_page(
+                keyword, PAGE_SIZE, "STATUS_SOLD_OUT", None, page_token)
+        except Exception as e:
+            print(f"  メルカリ取得失敗 ({keyword}, {i + 1}ページ目): {e}")
+            break
+        if not items:
+            break
+        out.extend(items)
+        # このページの中に参照期間より古い物が混ざっていたら、
+        # それより後ろのページはもっと古いだけなので打ち切ってよい
+        oldest = min((it.get("updated") or 0) for it in items)
+        if oldest and oldest < cutoff:
+            break
+        if not page_token:
+            break  # もう続きが無い
+        time.sleep(0.5)
+    return out
 
 
 def send_discord(message):
@@ -127,7 +158,7 @@ def main():
 
     for b in brands:
         for kw in b.get("keywords", []):
-            items = mercari.fetch_sold(kw, max_pages=SOLD_PAGES)
+            items = fetch_sold_until_cutoff(kw, cutoff)
             time.sleep(REQUEST_WAIT)
             # すでにDBにある商品には「いつの取引か」だけ書き込む（まだ無い行だけ）
             for it in items:

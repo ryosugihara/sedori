@@ -90,8 +90,11 @@ def _to_int(v):
         return None
 
 
-def _fetch_page(keyword, page_size, status, seller_ids, page_token):
-    """検索APIを1ページ分だけ呼ぶ（内部用）。(商品リスト, 次ページtoken) を返す。"""
+def fetch_page(keyword, page_size, status, seller_ids, page_token):
+    """検索APIを1ページ分だけ呼ぶ。(商品リスト, 次ページtoken) を返す。
+    自前でページ送りの終了条件を決めたい呼び出し元（例: collect_souba.pyの
+    「相場の参照期間より古くなったら打ち切る」）はこちらを直接使う。
+    """
     body = json.dumps(_search_body(keyword, page_size, status, seller_ids, page_token)).encode("utf-8")
     req = urllib.request.Request(API_URL, data=body, method="POST")
     req.add_header("Content-Type", "application/json")
@@ -146,7 +149,7 @@ def fetch_sold(keyword, page_size=120, status="STATUS_SOLD_OUT", seller_ids=None
     page_token = ""
     for i in range(max(1, max_pages)):
         try:
-            items, page_token = _fetch_page(keyword, page_size, status, seller_ids, page_token)
+            items, page_token = fetch_page(keyword, page_size, status, seller_ids, page_token)
         except Exception as e:
             print(f"  メルカリ取得失敗 ({keyword}, {i + 1}ページ目): {e}")
             break
