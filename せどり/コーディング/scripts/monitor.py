@@ -54,6 +54,7 @@ HARDOFF_STATE_FILE = "せどり/データ/state/hardoff_seen.json"  # おふも�
 
 SCAN_PROFIT_SEEN_FILE = "せどり/データ/state/scan_profit_seen.json"  # 在庫スキャンで送信済みの商品記録(重複通知防止)
 SCAN_PROFIT_CHECKED_FILE = "せどり/データ/state/scan_profit_checked.json"  # 調べたが利益無しだった商品と、調べた日時
+SCAN_PROFIT_REPORT_FILE = "せどり/データ/recon/SCAN_PROFIT.txt"  # 送信した商品名・金額・リンクの記録(あとで見返す用)
 RECHECK_SECONDS = 30 * 86400  # 利益無しだった商品を再チェックするまでの間隔(30日)
 SOUBA_FILE = "せどり/データ/watchlists/souba.json"                    # メルカリで売れた値段の記録(利益判定に使う)
 EXCLUDE_FILE = "せどり/データ/watchlists/exclude.json"                # 通知から除外する条件
@@ -784,6 +785,17 @@ def scan_profitable():
         f"🔎 在庫スキャン完了：利益が出そうな商品を {total} 件みつけました{note}"
     )
     send_items(hits)
+
+    # 商品名・金額・リンクをファイルにも残す（Discordの通知履歴を遡らなくても
+    # あとで見返せるように。send_items後に来たDiscord障害等でも記録は残る）
+    lines = [f"在庫スキャン結果  {total}件"]
+    for it in hits:
+        m = it["img_match"]
+        lines.append(f"- [{it.get('shop')}] {it['title'][:40]} 仕入{it['price']} "
+                     f"利益¥{m['profit']:,} {it['url']}")
+    os.makedirs("せどり/データ/recon", exist_ok=True)
+    with open(SCAN_PROFIT_REPORT_FILE, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines))
 
     # 今回送信した分を「送信済み」として記録する（次回以降は重複通知しない）
     notified_before.update(it["_seen_key"] for it in hits)
