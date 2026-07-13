@@ -20,6 +20,7 @@ import souba_match  # 画像照合の部品
 import mercari      # メルカリ検索の部品
 
 REPORT_FILE = "せどり/データ/recon/MERCARI_SCAN.txt"
+SEEN_FILE = "せどり/データ/state/mercari_scan_seen.json"  # 送信済み商品の記録(重複通知防止)
 
 # SCAN_TARGETSも相場収集リストも無い時だけ使う最終フォールバック
 DEFAULT_TARGETS = [
@@ -67,6 +68,7 @@ def main():
         return
     souba = monitor.load_souba()
     excludes = monitor.load_excludes()
+    notified_before = set(monitor.load_json_file(SEEN_FILE, []))
 
     strict = []   # 同デザイン＋利益あり（本命）
     loose = []    # 似た系統＋利益あり（参考）
@@ -98,6 +100,8 @@ def main():
             checked += 1
             if not m or m["profit"] is None or m["profit"] < souba["notify_line"]:
                 continue
+            if raw["id"] in notified_before:
+                continue  # 前回までのスキャンで既に送信済み
             it["img_match"] = m
             if m["rank"] == "同デザイン":
                 strict.append(it)
@@ -118,23 +122,31 @@ def main():
         f.write(report)
     print(report)
 
+    sent = []
     if strict:
         monitor.send_text(
             f"🛒 メルカリ内スキャン結果：🟢 **同デザインの売却実例より安い出品**を "
             f"{len(strict)} 件みつけました（利益2,000円以上のみ）"
         )
         monitor.send_items(strict[:10])
+        sent += strict[:10]
     if loose:
         monitor.send_text(
             f"🟡 参考：**似た系統で利益が出そうな出品** 上位{min(len(loose), 10)}件"
             "（同じ商品と断定はできていません。カードの上下の写真を見比べて判断してください）"
         )
         monitor.send_items(loose[:10])
+        sent += loose[:10]
     if not strict and not loose:
         monitor.send_text(
             f"🛒 メルカリ内スキャン結果：{checked}件を照合しましたが、"
             "利益が出そうな出品は今はありませんでした。"
         )
+
+    # 今回送信した分を「送信済み」として記録する（次回以降は重複通知しない）
+    if sent:
+        notified_before.update(it["id"] for it in sent)
+        monitor.save_json_file(SEEN_FILE, sorted(notified_before))
 
 
 if __name__ == "__main__":

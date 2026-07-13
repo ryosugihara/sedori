@@ -52,6 +52,7 @@ RINKAN_STATE_FILE = "せどり/データ/state/rinkan_seen.json"  # RINKAN の�
 HARDOFF_BRANDS_FILE = "せどり/データ/watchlists/watch_hardoff.json"      # おふもーる の見張るブランド一覧
 HARDOFF_STATE_FILE = "せどり/データ/state/hardoff_seen.json"  # おふもーる の「見た商品」記録
 
+SCAN_PROFIT_SEEN_FILE = "せどり/データ/state/scan_profit_seen.json"  # 在庫スキャンで送信済みの商品記録(重複通知防止)
 SOUBA_FILE = "せどり/データ/watchlists/souba.json"                    # メルカリで売れた値段の記録(利益判定に使う)
 EXCLUDE_FILE = "せどり/データ/watchlists/exclude.json"                # 通知から除外する条件
 SOLD_DB_FILE = "せどり/データ/data/sold/sold_items.json"   # 売却済み商品DB(画像から抽出した相場・Phase2で予測に使う)
@@ -694,7 +695,9 @@ def scan_profitable():
     """監視中の全ブランドの『今ある在庫』を全部しらべて、利益が出そうな物を通知する。
     ①(優先ブランド)か②(profit_only)かは関係なく、今の出品の中から
     予想利益が通知ライン以上の商品を探す。
-    （1回限りの『棚卸しスキャン』。state＝見た記録 はいじらない）
+    （1回限りの『棚卸しスキャン』。新着監視のstate＝見た記録 はいじらないが、
+    このスキャン自身の送信済み記録 SCAN_PROFIT_SEEN_FILE で
+    同じ商品を毎回重複して通知しないようにする）
     """
     if not image_match_ready():
         send_text("🔎 在庫スキャン中止：画像判定の準備（相場DBかAI）が揃っていません。")
@@ -702,6 +705,7 @@ def scan_profitable():
     souba = load_souba()
     excludes = load_excludes()
     MAX_HITS = int(os.environ.get("SCAN_MAX", "30"))  # 通知しすぎ防止の上限
+    notified_before = set(load_json_file(SCAN_PROFIT_SEEN_FILE, []))
 
     # 監視している5サイト・全ブランドを対象にする（①②の区別なし）
     sources = [
@@ -733,6 +737,9 @@ def scan_profitable():
                 if dedup in seen_keys:
                     continue
                 seen_keys.add(dedup)
+                key = f"{dedup[0]}:{dedup[1]}"
+                if key in notified_before:
+                    continue  # 前回までのスキャンで既に送信済み
                 # 商品写真をメルカリ相場DBと見比べる（画像の指紋で照合）
                 match = None
                 if it.get("image"):
@@ -742,6 +749,7 @@ def scan_profitable():
                         or match["profit"] < souba["notify_line"]):
                     continue
                 it["img_match"] = match
+                it["_seen_key"] = key
                 hits.append(it)
             print(f"  {site}/{b.get('name')}: ここまで利益候補 {len(hits)} 件")
             time.sleep(REQUEST_WAIT)
@@ -763,6 +771,10 @@ def scan_profitable():
         f"🔎 在庫スキャン完了：利益が出そうな商品を {total} 件みつけました{note}"
     )
     send_items(hits)
+
+    # 今回送信した分を「送信済み」として記録する（次回以降は重複通知しない）
+    notified_before.update(it["_seen_key"] for it in hits)
+    save_json_file(SCAN_PROFIT_SEEN_FILE, sorted(notified_before))
 
 
 def main():
