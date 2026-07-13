@@ -26,6 +26,15 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: 相場DBをReleaseから取得
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p せどり/データ/data
+          gh release download souba-db --repo ${{ github.repository }} \
+            --pattern souba_db.sqlite --dir せどり/データ/data --clobber \
+            || echo "相場DBがまだ無い"
+
       - name: テストを実行
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}

@@ -44,6 +44,15 @@ jobs:
           pip install --quiet torch torchvision --index-url https://download.pytorch.org/whl/cpu
           pip install --quiet opencv-python-headless sentence-transformers pillow
 
+      - name: 相場DBをReleaseから取得（無ければ画像判定なしで続行）
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p せどり/データ/data
+          gh release download souba-db --repo ${{ github.repository }} \
+            --pattern souba_db.sqlite --dir せどり/データ/data --clobber \
+            || echo "相場DBがまだ無い。画像判定なしで続行"
+
       - name: テスト通知を実行
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}

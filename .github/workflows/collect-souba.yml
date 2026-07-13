@@ -38,17 +38,31 @@ jobs:
           pip install --quiet torch torchvision --index-url https://download.pytorch.org/whl/cpu
           pip install --quiet opencv-python-headless sentence-transformers pillow pyjwt cryptography
 
+      - name: 相場DBをReleaseから取得（前回までの分。無ければ新規作成として続行）
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p せどり/データ/data
+          gh release download souba-db --repo ${{ github.repository }} \
+            --pattern souba_db.sqlite --dir せどり/データ/data --clobber \
+            || echo "相場DBがまだ無い(初回)。新規作成します"
+
       - name: 相場を収集してDBに保存
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: python せどり/コーディング/scripts/collect_souba.py
 
-      - name: DBをリポジトリに保存
+      - name: 相場DBをReleaseに保存
+        # gitには入れない: DBは100MB近く・増え続けるためGitHubの1ファイル100MB上限に
+        # ぶつかる（コミットのたびにリポジトリ履歴も太る）。Releaseの添付ファイルなら
+        # 実質2GBまで扱え、履歴も汚さない。
         if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          git config user.name "github-actions"
-          git config user.email "github-actions@users.noreply.github.com"
-          git add せどり/データ/data/souba_db.sqlite
-          git commit -m "メルカリ相場DBを更新 [skip ci]" || echo "変更なし"
-          git pull --rebase origin ${{ github.ref_name }} || true
-          git push || echo "push スキップ"
+          gh release view souba-db --repo ${{ github.repository }} >/dev/null 2>&1 \
+            || gh release create souba-db --repo ${{ github.repository }} \
+                 --title "相場DB（自動更新）" \
+                 --notes "collect_souba.py が自動更新するメルカリ相場DB(souba_db.sqlite)。gitコミットではなくReleaseの添付ファイルとして保存（100MB上限回避）。"
+          gh release upload souba-db せどり/データ/data/souba_db.sqlite \
+            --repo ${{ github.repository }} --clobber

@@ -1,3 +1,7 @@
 # Python のキャッシュ（自動生成される一時ファイル。リポジトリに入れない）
 __pycache__/
 *.pyc
+
+# 相場DB（100MB近く・増え続けるためgitに入れずGitHub Releaseの添付ファイルとして保存する。
+# collect-souba.yml が Release「souba-db」にアップロード、他のワークフローはそこからダウンロードする）
+せどり/データ/data/souba_db.sqlite
