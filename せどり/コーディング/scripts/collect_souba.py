@@ -139,6 +139,12 @@ def main():
     if reserved:
         con.commit()
         print(f"予約出品（商品説明なし） {reserved} 件をDBから削除しました")
+    # 新品未使用(condition_id=1)は中古せどりの相場として使わない
+    # （新品は中古より高く売れがちで、そのまま相場に使うと利益を過大に見積もる）
+    brand_new = con.execute("DELETE FROM items WHERE condition_id = 1").rowcount
+    if brand_new:
+        con.commit()
+        print(f"新品未使用 {brand_new} 件をDBから削除しました（中古相場のみ残す）")
     # 相場は変動するので、古い取引（既定：半年より前）はDBから消す
     days = souba_days()
     cutoff = int(time.time()) - days * 86400
@@ -167,11 +173,12 @@ def main():
                         "UPDATE items SET updated=? WHERE id=? AND updated IS NULL",
                         (it["updated"], it["id"]),
                     )
-            # まだDBに無くて、取引が新しく（半年以内）、予約出品でもない物だけを入れる
+            # まだDBに無くて、取引が新しく（半年以内）、予約出品でも新品未使用でもない物だけを入れる
             fresh = [it for it in items
                      if it["id"] and it["id"] not in known
                      and not (it.get("updated") and it["updated"] < cutoff)
-                     and not ("専用" in it.get("name", "") and len(it.get("name", "")) <= 15)]
+                     and not ("専用" in it.get("name", "") and len(it.get("name", "")) <= 15)
+                     and it.get("condition_id") != 1]
             print(f"  「{kw}」 取得{len(items)}件 / 新規{len(fresh)}件")
 
             for it in fresh:

@@ -101,6 +101,8 @@ def main():
             seen.add(raw["id"])
             if raw["id"] in notified_before:
                 continue  # 前回までのスキャンで既に送信済み
+            if raw.get("condition_id") == 1:
+                continue  # 新品未使用は中古せどりの対象外
             it = {
                 "id": raw["id"],
                 "brand": brand,
