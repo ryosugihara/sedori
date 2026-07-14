@@ -119,6 +119,12 @@
       "name": "adidas",
       "keyword": "adidas",
       "profit_only": true
+    },
+    {
+      "name": "Balenciaga",
+      "keyword": "バレンシアガ",
+      "profit_only": true,
+      "only_keywords": ["バッグ", "バック", "かばん", "カバン", "bag", "ショルダーバッグ", "トートバッグ", "ハンドバッグ", "ボストンバッグ", "クラッチ", "ポーチ", "トート", "ショルダー"]
     }
   ]
 }
