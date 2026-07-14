@@ -3,8 +3,12 @@ name: KINDAL新着監視
 
 on:
   schedule:
-    # 30分ごとに「新しい見張り」を開始する（バックアップ用。普段はPATで自動再起動）
-    - cron: "*/30 * * * *"
+    # 自動再起動チェーン(PAT)が途切れた時だけの保険。
+    # 実測: workflow_dispatch(自動再起動)は約300〜305分で毎回success、
+    # schedule起動は同じconcurrencyグループに割り込んで毎回cancelledされていた
+    # （30分毎だと5時間ループの最中に必ず衝突する）。ループより長い間隔にして
+    # 「チェーンが本当に止まっている時だけ」動くようにする。
+    - cron: "0 */6 * * *" # 6時間ごと
   workflow_dispatch: # 手動でも開始できる
     inputs:
       loop_minutes:

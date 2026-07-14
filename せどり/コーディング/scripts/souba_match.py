@@ -172,17 +172,11 @@ def match_item(item, souba, stats=None):
         best_c, best_d = float(sims_c[i0]), float(sims_d[i0])
         if best_d >= 0.90:
             _count("sim_90plus")  # 類似度(DINO)90%以上だった件数
-        rank = ("同デザイン" if (best_c >= strong_c and best_d >= strong_d)
-                else "似た系統")
 
         # GG柄・モノグラム等の「どれも同じに見える柄」は、写真では
         # 型番やサイズの違いを見分けられないので、同デザインと断定しない。
         # （繰り返し柄は幾何検証もAIも誤りやすいため、昇格の対象外にする）
         patterns = [p.lower() for p in souba.get("plain_patterns", [])]
-        ref_text = (rs[i0][1] or "").lower()
-        capped = any(p in text or p in ref_text for p in patterns)
-        if rank == "同デザイン" and capped:
-            rank = "似た系統"
 
         # 予想相場は『控えめ』に見積もる（高いモデルに引っ張られて
         # 利益を過大に出さないよう、安い方から2番目の売値を使う）
@@ -208,75 +202,83 @@ def match_item(item, souba, stats=None):
         # 『似た系統』も含め、どちらにも合格できなかった実例は参考表示すら
         # しない（以前は『似た系統』がノーチェックで表示されており、
         # CLIP/DINOの類似度だけで無関係な商品が参考に出ることがあった）。
+        #
+        # 以前は一番似ていた実例(i0)だけを答え合わせしていたが、写り方
+        # (角度・トリミング)次第でi0だけ幾何検証やAIに落ちることがあり、
+        # 2番目以降の実例でなら合格したはずの商品まで捨てていた。
+        # そこでDINO類似度が高い順に最大5件を順番に試し、最初に合格した
+        # 実例を採用する（AI確認は費用・レート制限のため上位2件までに絞る）。
         import geom_verify
         geo_th = int(souba.get("geo_inliers", 15))
-        raw_item = fingerprint.download_bytes(item["image"])
-        raw_ref = fingerprint.download_bytes(rs[i0][5]) if rs[i0][5] else None
-
-        # 幾何検証(ORB)は白黒画像で処理するため色を一切見ておらず、ステッチや
-        # シルエットが似ているだけの色違い商品(黒デニム×紺デニム等)を誤って
-        # 合格させることがある。色が明らかに違う場合は、幾何検証やAIを試す
-        # までもなく別物として扱う。
         color_th = float(souba.get("color_distance_th", 30))
-        if raw_item and raw_ref:
+        raw_item = fingerprint.download_bytes(item["image"])
+        if raw_item is None:
+            _count("reason_その他_画像取得失敗")
+            return None
+
+        MAX_AI_TRIES = 2
+        ai_tries = 0
+        verified = None
+        verified_i = None
+        verified_rank = None
+        saw_pattern_reject = False
+
+        for ci in picked:
+            c, d = float(sims_c[ci]), float(sims_d[ci])
+            ref_text_c = (rs[ci][1] or "").lower()
+            capped_c = any(p in text or p in ref_text_c for p in patterns)
+            cand_rank = ("同デザイン" if (c >= strong_c and d >= strong_d and not capped_c)
+                         else "似た系統")
+
+            raw_ref = fingerprint.download_bytes(rs[ci][5]) if rs[ci][5] else None
+            if raw_ref is None:
+                continue
+
+            # 幾何検証(ORB)は白黒画像で処理するため色を一切見ておらず、ステッチや
+            # シルエットが似ているだけの色違い商品(黒デニム×紺デニム等)を誤って
+            # 合格させることがある。色が明らかに違う場合は、この実例は諦めて
+            # 次の候補を試す。
             color_dist = geom_verify.color_distance(raw_item, raw_ref)
             if color_dist is not None and color_dist > color_th:
-                _count("reason_類似度不足_色違い")
-                return None
+                continue
 
-        inl = (geom_verify.inlier_count(raw_item, raw_ref)
-               if raw_item and raw_ref else 0)
-        # GG柄等の繰り返し柄は、幾何検証も似た特徴点だらけで誤って合格しやすい
-        # （geom_verify.py自身の注意書き通り）ため、幾何検証の結果は信用しない。
-        geo_ok = inl >= geo_th and not capped
+            inl = geom_verify.inlier_count(raw_item, raw_ref)
+            # GG柄等の繰り返し柄は、幾何検証も似た特徴点だらけで誤って合格しやすい
+            # （geom_verify.py自身の注意書き通り）ため、幾何検証の結果は信用しない。
+            if inl >= geo_th and not capped_c:
+                verified = f"幾何検証OK({inl}点一致)"
+                verified_i, verified_rank = ci, cand_rank
+                break
 
-        ai_verdict = [None]  # AIには1回しか聞かない（レート制限・費用を節約）
-
-        def ask_ai():
-            if ai_verdict[0] is None:
-                import verify_ai
-                if verify_ai.available():
-                    ai_verdict[0] = verify_ai.same_product(
-                        item["image"], rs[i0][5],
-                        item.get("title", ""), rs[i0][1] or "") or "unsure"
-                else:
-                    ai_verdict[0] = "unsure"
-            return ai_verdict[0]
-
-        verified = None
-        if geo_ok:
-            verified = f"幾何検証OK({inl}点一致)"
-        elif rank == "同デザイン":
-            # 同デザイン候補は幾何検証に落ちても、AIのカギがあれば必ず確認する
-            if ask_ai() == "same":
+            if ai_tries >= MAX_AI_TRIES:
+                continue
+            ai_tries += 1
+            import verify_ai
+            v = verify_ai.same_product(
+                item["image"], rs[ci][5],
+                item.get("title", ""), rs[ci][1] or "") if verify_ai.available() else None
+            if v == "same":
                 verified = "AIが写真を見比べて確認"
-
-        if rank == "同デザイン" and not verified:
-            rank = "似た系統"  # 答え合わせに落ちたら断定しない
+                verified_i = ci
+                verified_rank = "似た系統" if capped_c else cand_rank
+                break
+            if v == "different" and capped_c:
+                saw_pattern_reject = True  # 柄物で明確に別物と判定された候補があった
 
         if verified is None:
-            # ここに来るのは『似た系統』のまま裏付けが無い場合。
-            # 利益が出るかどうかに関わらず、AI(Gemini)のカギがあれば必ず
-            # 見比べてもらう（柄物は昇格させず除外判定のみに使う）。
-            v = ask_ai()
-            if v == "same":
-                if not capped:
-                    rank = "同デザイン"
-                verified = "AIが写真を見比べて確認"
-            elif v == "different" and capped:
+            if saw_pattern_reject:
                 _count("reason_類似度不足_柄物別物判定")
-                return None  # 柄物で明確に別物と判定されたので除外
-            if verified is None:
+            else:
                 _count("reason_類似度不足_未確認")
-                return None  # 幾何検証にもAIにも裏付けが取れない実例は出さない
+            return None  # 幾何検証にもAIにも裏付けが取れる実例が1件も無い
 
         _count("matched")  # 幾何検証かAIで裏付けが取れた（=返り値を返す）件数
-        r0 = rs[i0]  # 一番似ていた実例（通知で根拠として見せる）
+        r0 = rs[verified_i]  # 実際に答え合わせに合格した実例（通知で根拠として見せる）
         return {
-            "rank": rank,
-            "verified": verified,  # 二重確認に合格した方法（Noneなら未確認）
-            "best_sim": best_d,   # 同一商品らしさ(DINO)
-            "clip_sim": best_c,   # 見た目の系統の近さ(CLIP)
+            "rank": verified_rank,
+            "verified": verified,  # 二重確認に合格した方法
+            "best_sim": best_d,   # 同一商品らしさ(DINO、一番似ていた候補の値)
+            "clip_sim": best_c,   # 見た目の系統の近さ(CLIP、一番似ていた候補の値)
             "estimate": estimate,
             "net": net,
             "profit": profit,
