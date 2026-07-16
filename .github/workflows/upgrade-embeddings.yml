@@ -1,0 +1,76 @@
+# 相場DBの指紋を新方式(v2: 背景切り抜き + SigLIP + DINOv2-large)で作り直す。
+# 5.4万件を無料CPUで少しずつ処理するため、全件そろうまで自動で繰り返し実行する。
+# 旧方式(vec/vec2)は残すので、この作業中も今の画像判定は止まらない。
+name: 相場DB指紋アップグレード
+
+on:
+  schedule:
+    - cron: "0 */3 * * *" # 3時間ごと。全件終わるまで自動で続ける
+  workflow_dispatch:
+    inputs:
+      minutes:
+        description: "1回の作業時間(分)"
+        default: "270"
+        required: false
+      limit:
+        description: "今回処理する件数(動作確認用。0=時間いっぱい)"
+        default: "0"
+        required: false
+
+permissions:
+  contents: write
+
+# 相場DBを書き換える処理(収集・アップグレード)どうしが同時に走らないようにする
+concurrency:
+  group: souba-db-write
+  cancel-in-progress: false
+
+jobs:
+  upgrade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - name: リポジトリを取得
+        uses: actions/checkout@v4
+
+      - name: Pythonを準備
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: AIモデルの置き場をキャッシュ（2回目から速くなる）
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/huggingface
+            ~/.u2net
+          key: siglip-so400m-dinov2large-rembg
+
+      - name: AIの道具を入れる
+        run: |
+          pip install --quiet torch torchvision --index-url https://download.pytorch.org/whl/cpu
+          pip install --quiet transformers pillow numpy sentencepiece protobuf rembg onnxruntime
+
+      - name: 相場DBをReleaseから取得
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p せどり/データ/data
+          gh release download souba-db --repo ${{ github.repository }} \
+            --pattern souba_db.sqlite --dir せどり/データ/data --clobber \
+            || echo "相場DBがまだ無い"
+
+      - name: 新方式の指紋づくり
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          UPGRADE_MINUTES: ${{ github.event.inputs.minutes || '270' }}
+          UPGRADE_LIMIT: ${{ github.event.inputs.limit || '0' }}
+        run: python せどり/コーディング/scripts/upgrade_embeddings.py
+
+      - name: 相場DBをReleaseに保存
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload souba-db せどり/データ/data/souba_db.sqlite \
+            --repo ${{ github.repository }} --clobber || echo "アップロードするDBが無い"

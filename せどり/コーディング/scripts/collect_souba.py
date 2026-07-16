@@ -62,6 +62,13 @@ def open_db():
     if "vec2" not in cols:
         # vec2 = DINOv2の指紋（同一商品の見分け用・CLIPとの二重チェック）
         con.execute("ALTER TABLE items ADD COLUMN vec2 BLOB")
+    # 新方式(v2)の指紋。旧方式(vec/vec2)と並べて持ち、精度を実測してから切り替える。
+    if "vec3" not in cols:
+        # vec3 = SigLIPの指紋（背景切り抜き後・見た目の系統・新世代）
+        con.execute("ALTER TABLE items ADD COLUMN vec3 BLOB")
+    if "vec4" not in cols:
+        # vec4 = DINOv2-largeの指紋（背景切り抜き後・同一商品の見分け・大型）
+        con.execute("ALTER TABLE items ADD COLUMN vec4 BLOB")
     return con
 
 

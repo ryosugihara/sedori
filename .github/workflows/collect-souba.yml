@@ -9,9 +9,9 @@ on:
 permissions:
   contents: write
 
-# 収集どうしがぶつからないようにする
+# 相場DBを書き換える処理(収集・指紋アップグレード)どうしが同時に走らないようにする
 concurrency:
-  group: collect-souba
+  group: souba-db-write
   cancel-in-progress: false
 
 jobs:
