@@ -18,7 +18,8 @@ permissions:
 jobs:
   scan:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 180 # 精度重視で1件ごとの照合(候補5件+AI確認)が重くなり90分では
+                         # 全在庫を見切れず打ち切られたため延長(メルカリ内スキャンと同じ)
     steps:
       - name: リポジトリを取得
         uses: actions/checkout@v4
