@@ -102,7 +102,7 @@ def try_match_and_send(raw, brand, souba, excludes, notified_before, stats, tag=
     }
     if monitor.is_excluded(it, excludes):
         return False
-    m = souba_match.match_item(it, souba, stats=stats)
+    m = souba_match.match_item(it, souba, stats=stats, min_profit=souba["notify_line"])
     # 「同じと確認できた同デザイン」だけ送る（未確認の「似た系統」は送らない）
     if (not m or m["rank"] != "同デザイン"
             or m["profit"] is None or m["profit"] < souba["notify_line"]):
@@ -220,7 +220,7 @@ def main():
             }
             if monitor.is_excluded(it, excludes):
                 continue
-            m = souba_match.match_item(it, souba, stats=stats)
+            m = souba_match.match_item(it, souba, stats=stats, min_profit=souba["notify_line"])
             checked += 1
             # 「同じと確認できた同デザイン」だけ送る。以前は未確認の「似た系統」も
             # 送っていたため『違う商品が来る』原因になっていた（断定できない物は送らない）。

@@ -495,10 +495,13 @@ def check_source(brands, seen, first_run, get_items, do_slow=True):
                     continue
                 if not matches_only(it, only_kw):
                     continue
-                # 商品写真をメルカリ相場DBと見比べる（画像の指紋で照合）
+                # 商品写真をメルカリ相場DBと見比べる（画像の指紋で照合）。
+                # ②ブランドは利益ライン以上の時だけ通知するので、利益ライン未満は
+                # 重い答え合わせを省いて高速化する（①ブランドは表示用に常に照合）。
                 match = None
                 if image_match_ready() and it.get("image"):
-                    match = souba_match.match_item(it, souba)
+                    mp = souba["notify_line"] if profit_only else None
+                    match = souba_match.match_item(it, souba, min_profit=mp)
                 if match:
                     it["img_match"] = match  # 通知カードに表示するため覚えておく
                 if profit_only:
@@ -630,7 +633,8 @@ def scan_profitable():
                 examined += 1
                 match = None
                 if it.get("image"):
-                    match = souba_match.match_item(it, souba, stats=stats)
+                    match = souba_match.match_item(it, souba, stats=stats,
+                                                   min_profit=souba["notify_line"])
                 if (not match or match["rank"] != "同デザイン"
                         or match["profit"] is None
                         or match["profit"] < souba["notify_line"]):

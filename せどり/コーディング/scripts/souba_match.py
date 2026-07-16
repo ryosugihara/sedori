@@ -94,12 +94,15 @@ def _load():
     print(f"  相場DB読み込み: {total}件 / {len(_cache['brands'])}ブランド")
 
 
-def match_item(item, souba, stats=None):
+def match_item(item, souba, stats=None, min_profit=None):
     """新着商品(item)の写真をDBと照合する。一致が無い/失敗なら None。
 
     souba には手数料・送料・しきい値が入っている（monitor.load_souba()の返り値）。
     stats に辞書を渡すと、どこで弾かれたか・類似度・利益の分布を集計する
     （诊断レポート用。個数を数えるだけで判定そのものには影響しない）。
+    min_profit を渡すと、予想利益がその額未満の商品は重い答え合わせ
+    （幾何検証・色比較・AI確認）を行わず None を返す。通知しない商品の照合を
+    省いてスキャンを大幅に高速化する（送る商品は変わらない）。
     """
     def _count(key):
         if stats is not None:
@@ -195,6 +198,13 @@ def match_item(item, souba, stats=None):
                 _count("profit_low")           # 利益0〜通知ライン未満だった件数
             else:
                 _count("profit_ok")            # 利益が通知ライン以上だった件数
+
+        # 予想利益が min_profit 未満なら、どのみち通知しないので、ここで打ち切って
+        # 重い答え合わせ(参照画像DL・幾何検証・色比較・AI確認)を省く。
+        # 実測では照合対象の約9割が利益ライン未満で、その全てに答え合わせしていた
+        # ため、スキャンが制限時間内に終わらなくなっていた（送る商品は変わらない）。
+        if min_profit is not None and profit is not None and profit < min_profit:
+            return None
 
         # 通知する実例は必ず答え合わせに合格した物だけにする（二重確認）:
         #  1) 幾何検証（無料）… 細部の点が同じ位置関係で一致するか
