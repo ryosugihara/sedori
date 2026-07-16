@@ -65,8 +65,112 @@ def load_targets():
 
 MAX_SENT = int(os.environ.get("SCAN_MAX", "20"))  # 通知しすぎ防止の上限
 
+# ===== 優先スキャン(高頻度ループ) =====================================
+# メルカリは個人間売買のため、良い出品はすぐ他の買い手に取られてしまう。
+# 通常のスキャン(1日1回・全107キーワード)では間に合わないブランドだけ、
+# KINDAL新着監視と同じ「短い間隔でループし続ける」方式で見張る。
+# 対象は watch_mercari.json 内の該当ブランドのキーワードをそのまま使う
+# （増やしたい時はここにブランド名を足すだけでよい）。
+PRIORITY_BRANDS = ["Balenciaga"]
+PRIORITY_SEEN_FILE = SEEN_FILE  # 通常スキャンと同じ記録を共有（二重通知防止）
+
+
+def load_priority_targets():
+    data = monitor.load_json_file(WATCH_MERCARI_FILE, {"brands": []})
+    return [(b.get("name", ""), kw)
+            for b in data.get("brands", [])
+            for kw in b.get("keywords", [])
+            if b.get("name") in PRIORITY_BRANDS]
+
+
+def try_match_and_send(raw, brand, souba, excludes, notified_before, stats, tag=""):
+    """1商品を照合し、条件を満たせば即送信する。送信したらTrueを返す。"""
+    if raw["id"] in notified_before:
+        return False  # 前回までのスキャンで既に送信済み
+    if raw.get("condition_id") == 1:
+        return False  # 新品未使用は中古せどりの対象外
+    it = {
+        "id": raw["id"],
+        "brand": brand,
+        "title": raw["name"],
+        "price": "¥{:,}".format(raw["price"]),
+        "price_num": raw["price"],
+        "url": f"https://jp.mercari.com/item/{raw['id']}",
+        "image": raw.get("image"),
+        "shop": "メルカリ(販売中)",
+        "category": "",
+    }
+    if monitor.is_excluded(it, excludes):
+        return False
+    m = souba_match.match_item(it, souba, stats=stats)
+    if not m or m["profit"] is None or m["profit"] < souba["notify_line"]:
+        return False
+    it["img_match"] = m
+    mark = "🟢" if m["rank"] == "同デザイン" else "🟡"
+    label = "同デザインの売却実例より安い出品" if m["rank"] == "同デザイン" else "参考：似た系統で利益が出そうな出品"
+    monitor.send_text(f"{tag}{mark} **{label}**をみつけました（予想利益 約¥{m['profit']:,}）")
+    monitor.send_items([it])
+    notified_before.add(raw["id"])
+    monitor.save_json_file(PRIORITY_SEEN_FILE, sorted(notified_before))
+    return True
+
+
+def priority_scan_once(souba, excludes, notified_before, stats):
+    """優先ブランドのキーワードを1周だけ調べる。送信した件数を返す。"""
+    sent = 0
+    for brand, kw in load_priority_targets():
+        try:
+            items = mercari.fetch_on_sale(kw)
+        except Exception as e:
+            print(f"  取得失敗 ({kw}): {e}")
+            continue
+        for raw in items:
+            if try_match_and_send(raw, brand, souba, excludes, notified_before, stats, tag="⚡【優先】"):
+                sent += 1
+        time.sleep(1.0)
+    return sent
+
+
+def priority_loop():
+    """優先ブランドだけを高頻度(既定30秒間隔)で見張り続ける（KINDAL新着監視と同じ方式）。
+    メルカリは個人間売買で良い出品がすぐ売れてしまうため、1日1回のスキャンでは
+    間に合わない『買い付け競争が起きやすいブランド』専用のループ。
+    """
+    if not souba_match.ready():
+        monitor.send_text("⚡ 優先スキャン中止：相場DBかAIの準備が揃っていません。")
+        return
+    souba = monitor.load_souba()
+    excludes = monitor.load_excludes()
+    notified_before = set(monitor.load_json_file(PRIORITY_SEEN_FILE, []))
+    poll_seconds = int(os.environ.get("POLL_SECONDS", "30"))
+    loop_minutes = int(os.environ.get("LOOP_MINUTES", "300"))
+    targets = load_priority_targets()
+    print(f"優先スキャンループ開始: {[b for b, _ in targets]} / {poll_seconds}秒ごと・最長{loop_minutes}分")
+    if not targets:
+        monitor.send_text("⚡ 優先スキャン中止：対象ブランドのキーワードがwatch_mercari.jsonにありません。")
+        return
+
+    end_time = time.time() + loop_minutes * 60
+    total_sent = 0
+    while True:
+        stats = {}
+        sent = priority_scan_once(souba, excludes, notified_before, stats)
+        total_sent += sent
+        if sent:
+            print(f"  優先スキャン 1周: {sent}件送信")
+        if time.time() >= end_time:
+            break
+        time.sleep(poll_seconds)
+    print(f"優先スキャンループ 終了（合計送信 {total_sent}件）")
+
+# ===== ここまで(優先スキャン) ==========================================
+
 
 def main():
+    if os.environ.get("PRIORITY_LOOP") == "1":
+        priority_loop()
+        return
+
     if not souba_match.ready():
         monitor.send_text("🛒 メルカリ内スキャン中止：相場DBかAIの準備が揃っていません。")
         return

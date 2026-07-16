@@ -1,0 +1,93 @@
+# メルカリ優先スキャン（Balenciagaバッグ等、出品されたらすぐ買い付け競争になる
+# ブランドだけを高頻度で見張るループ。通常のメルカリ内スキャンは1日1回のため
+# 間に合わない）
+name: メルカリ優先スキャン
+
+on:
+  schedule:
+    # 自動再起動チェーン(PAT)が途切れた時だけの保険。KINDAL新着監視(monitor.yml)と
+    # 同じ理由でループより長い間隔にする（30分毎だと5時間ループの最中に必ず衝突する）。
+    - cron: "0 */6 * * *" # 6時間ごと
+  workflow_dispatch:
+    inputs:
+      loop_minutes:
+        description: "1回の監視時間(分)。テスト用に短くもできる"
+        default: "300"
+        required: false
+
+permissions:
+  contents: write
+
+# 同時に2つ動いて記録がぶつからないようにする
+concurrency:
+  group: mercari-priority-scan
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360 # 安全のための最大時間（6時間）
+    steps:
+      - name: リポジトリを取得
+        uses: actions/checkout@v4
+
+      - name: Pythonを準備
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: AIモデルの置き場をキャッシュ（2回目から速くなる）
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: clip-and-dinov2
+
+      - name: AIの道具を入れる
+        run: |
+          pip install --quiet torch torchvision --index-url https://download.pytorch.org/whl/cpu
+          pip install --quiet opencv-python-headless sentence-transformers transformers pillow pyjwt cryptography
+
+      - name: 相場DBをReleaseから取得（無ければ画像判定なしで続行）
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p せどり/データ/data
+          gh release download souba-db --repo ${{ github.repository }} \
+            --pattern souba_db.sqlite --dir せどり/データ/data --clobber \
+            || echo "相場DBがまだ無い。画像判定なしで続行"
+
+      - name: 優先スキャン（ループ）を実行
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          PRIORITY_LOOP: "1" # 優先ブランドの高頻度ループを有効にする
+          POLL_SECONDS: "30" # 何秒ごとにチェックするか
+          LOOP_MINUTES: ${{ github.event.inputs.loop_minutes || '300' }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }} # 無料AIのカギ(あれば最終確認に使う)
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }} # 有料AIのカギ(任意)
+        run: python せどり/コーディング/scripts/mercari_scan.py
+
+      - name: 送信済み記録を保存
+        if: always()
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add せどり/データ/state/mercari_scan_seen.json
+          git commit -m "メルカリ優先スキャン: 送信済み記録を更新 [skip ci]" || echo "変更なし"
+          git pull --rebase origin ${{ github.ref_name }} || true
+          git push || echo "push スキップ"
+
+      - name: 次の監視を自動で開始（PATがある時だけ）
+        if: success()
+        env:
+          PAT: ${{ secrets.PAT_TOKEN }}
+        run: |
+          if [ -n "$PAT" ]; then
+            echo "次の優先スキャンを自動起動します"
+            curl -sS -X POST \
+              -H "Authorization: Bearer $PAT" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/${{ github.repository }}/actions/workflows/mercari-priority-scan.yml/dispatches" \
+              -d '{"ref":"${{ github.ref_name }}"}'
+          else
+            echo "PAT_TOKEN 未設定のため自動再起動はスキップ（cron/手動に依存）"
+          fi
