@@ -4,6 +4,6 @@
     { "name": "Saint Laurent", "collection": "yvessaintlaurent" },
     { "name": "Saint Laurent", "collection": "saintlaurentparis" },
     { "name": "Undercover", "collection": "undercover", "only_keywords": ["デニム", "denim", "ジーンズ", "jeans"] },
-    { "name": "Balenciaga", "collection": "balenciaga", "profit_only": true, "only_keywords": ["バッグ", "バック", "かばん", "カバン", "bag", "ショルダーバッグ", "トートバッグ", "ハンドバッグ", "ボストンバッグ", "クラッチ", "ポーチ", "トート", "ショルダー"] }
+    { "name": "Balenciaga", "collection": "balenciaga", "profit_only": true, "fast": true, "only_keywords": ["バッグ", "バック", "かばん", "カバン", "bag", "ショルダーバッグ", "トートバッグ", "ハンドバッグ", "ボストンバッグ", "クラッチ", "ポーチ", "トート", "ショルダー"] }
   ]
 }

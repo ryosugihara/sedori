@@ -71,7 +71,7 @@ MAX_SENT = int(os.environ.get("SCAN_MAX", "20"))  # 通知しすぎ防止の上�
 # KINDAL新着監視と同じ「短い間隔でループし続ける」方式で見張る。
 # 対象は watch_mercari.json 内の該当ブランドのキーワードをそのまま使う
 # （増やしたい時はここにブランド名を足すだけでよい）。
-PRIORITY_BRANDS = ["Balenciaga"]
+PRIORITY_BRANDS = ["Balenciaga", "Saint Laurent"]
 PRIORITY_SEEN_FILE = SEEN_FILE  # 通常スキャンと同じ記録を共有（二重通知防止）
 
 

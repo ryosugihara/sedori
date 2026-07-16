@@ -59,10 +59,10 @@ SOUBA_FILE = "せどり/データ/watchlists/souba.json"                    # �
 EXCLUDE_FILE = "せどり/データ/watchlists/exclude.json"                # 通知から除外する条件
 PER_PAGE = 250                        # 1回の取得件数（Shopifyの最大値）
 MAX_PAGES = 20                        # 安全のための上限（無限ループ防止）
-REQUEST_WAIT = 1.5                    # サイトへの優しさ（アクセスの間に待つ秒数）
+REQUEST_WAIT = 1.0                    # サイトへの優しさ（アクセスの間に待つ秒数）
 
 # ↓ ループ監視（短い間隔で見張り続ける）用の設定。数字は環境変数で変えられます。
-POLL_SECONDS = int(os.environ.get("POLL_SECONDS", "30"))  # 何秒ごとにチェックするか
+POLL_SECONDS = int(os.environ.get("POLL_SECONDS", "15"))  # 何秒ごとにチェックするか
 LOOP_MINUTES = int(os.environ.get("LOOP_MINUTES", "27"))  # 1回の見張りを何分続けるか
 
 def image_match_ready():
@@ -461,8 +461,10 @@ def check_source(brands, seen, first_run, get_items, do_slow=True):
         # （文字だけだと別デザインを誤通知してしまうため。①ブランドは影響なし）
         if b.get("profit_only") and not image_match_ready():
             continue
-        # ②ブランドは、ゆっくり巡回の時だけチェックする（①の速度を守るため）
-        if b.get("profit_only") and not do_slow:
+        # ②ブランドは、ゆっくり巡回の時だけチェックする（①の速度を守るため）。
+        # ただし fast=true のブランド(バレンシアガ等、売れるのが速い高額品)は、
+        # 利益判定は行いつつ毎回チェックする（5分待つと売り切れて間に合わないため）。
+        if b.get("profit_only") and not do_slow and not b.get("fast"):
             continue
         # 識別子：KINDALは collection、トレファクは keyword を使う
         key = b.get("collection") or b.get("keyword")
@@ -741,7 +743,10 @@ def main():
     # --- ループ監視モード（短い間隔で見張り続ける）---
     # ②ブランド(利益が出る時だけ通知)は SLOW_SECONDS ごとにだけチェックする。
     # こうすると①の優先ブランド(サンローラン等)の見張りが遅くならない。
-    SLOW_SECONDS = int(os.environ.get("SLOW_SECONDS", "300"))  # ②は何秒ごとに見るか
+    # ②(profit_only)の重い全ブランド巡回は、走ると数分かかり その間 ①や fast の
+    # 高速チェックを止めてしまう。頻度を下げて(10分ごと)高速ブランドの足を引っ張らない
+    # ようにする。全ブランドの棚卸しは毎日の在庫スキャンが別途担当する。
+    SLOW_SECONDS = int(os.environ.get("SLOW_SECONDS", "600"))  # ②は何秒ごとに見るか
     print(f"ループ監視開始: {POLL_SECONDS}秒ごと / ②ブランドは{SLOW_SECONDS}秒ごと / 最長 {LOOP_MINUTES}分")
     end_time = time.time() + LOOP_MINUTES * 60
 
