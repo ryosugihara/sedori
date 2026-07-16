@@ -103,12 +103,12 @@ def try_match_and_send(raw, brand, souba, excludes, notified_before, stats, tag=
     if monitor.is_excluded(it, excludes):
         return False
     m = souba_match.match_item(it, souba, stats=stats)
-    if not m or m["profit"] is None or m["profit"] < souba["notify_line"]:
+    # 「同じと確認できた同デザイン」だけ送る（未確認の「似た系統」は送らない）
+    if (not m or m["rank"] != "同デザイン"
+            or m["profit"] is None or m["profit"] < souba["notify_line"]):
         return False
     it["img_match"] = m
-    mark = "🟢" if m["rank"] == "同デザイン" else "🟡"
-    label = "同デザインの売却実例より安い出品" if m["rank"] == "同デザイン" else "参考：似た系統で利益が出そうな出品"
-    monitor.send_text(f"{tag}{mark} **{label}**をみつけました（予想利益 約¥{m['profit']:,}）")
+    monitor.send_text(f"{tag}🟢 **同デザインの売却実例より安い出品**をみつけました（予想利益 約¥{m['profit']:,}）")
     monitor.send_items([it])
     notified_before.add(raw["id"])
     monitor.save_json_file(PRIORITY_SEEN_FILE, sorted(notified_before))
@@ -222,24 +222,19 @@ def main():
                 continue
             m = souba_match.match_item(it, souba, stats=stats)
             checked += 1
-            if not m or m["profit"] is None or m["profit"] < souba["notify_line"]:
+            # 「同じと確認できた同デザイン」だけ送る。以前は未確認の「似た系統」も
+            # 送っていたため『違う商品が来る』原因になっていた（断定できない物は送らない）。
+            if (not m or m["rank"] != "同デザイン"
+                    or m["profit"] is None or m["profit"] < souba["notify_line"]):
                 continue
             # 見つけたその場ですぐ送信し、記録も即保存する
             # （まだ売り切れていないうちに知らせるため）
             it["img_match"] = m
-            if m["rank"] == "同デザイン":
-                strict_n += 1
-                monitor.send_text(
-                    f"🛒 🟢 **同デザインの売却実例より安い出品**をみつけました"
-                    f"（予想利益 約¥{m['profit']:,}）"
-                )
-            else:
-                loose_n += 1
-                monitor.send_text(
-                    "🛒 🟡 参考：**似た系統で利益が出そうな出品**をみつけました"
-                    f"（予想利益 約¥{m['profit']:,}・同じ商品と断定はできていません。"
-                    "カードの上下の写真を見比べて判断してください）"
-                )
+            strict_n += 1
+            monitor.send_text(
+                f"🛒 🟢 **同デザインの売却実例より安い出品**をみつけました"
+                f"（予想利益 約¥{m['profit']:,}）"
+            )
             monitor.send_items([it])
             notified_before.add(raw["id"])
             monitor.save_json_file(SEEN_FILE, sorted(notified_before))
