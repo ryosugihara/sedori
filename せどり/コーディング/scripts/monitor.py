@@ -402,6 +402,17 @@ def is_excluded(item, excludes, brand=None):
     price = item.get("price_num") or 0
     brand = brand or item.get("brand")
 
+    # 0) 永久ブロックリスト（誤送信された特定の商品を二度と送らない）。
+    #    URL完全一致、または末尾のメルカリ商品ID(mXXXX)一致で止める。
+    url = (item.get("url") or "")
+    item_id = str(item.get("id") or "")
+    for b in excludes.get("block_urls", []):
+        b = (b or "").strip()
+        if not b:
+            continue
+        if b == url or (item_id and b.rstrip("/").endswith(item_id)) or (url and b in url):
+            return True
+
     # 1) NGキーワード（含まれていたら除外）
     for kw in excludes.get("ng_keywords", []):
         if kw.lower() in text:
