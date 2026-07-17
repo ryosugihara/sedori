@@ -2,6 +2,8 @@
 __pycache__/
 *.pyc
 
-# 相場DB（100MB近く・増え続けるためgitに入れずGitHub Releaseの添付ファイルとして保存する。
-# collect-souba.yml が Release「souba-db」にアップロード、他のワークフローはそこからダウンロードする）
+# 相場DB（100MB超・増え続けるためgitに入れずGitHub Releaseの添付ファイルとして保存する。
+# 圧縮版 souba_db.sqlite.gz をアップロード、ダウンロード後に展開して使う。
+# 大容量アップロードは失敗しやすいため圧縮で確実性を上げている）
 せどり/データ/data/souba_db.sqlite
+せどり/データ/data/souba_db.sqlite.gz

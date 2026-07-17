@@ -56,9 +56,12 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p せどり/データ/data
-          gh release download souba-db --repo ${{ github.repository }} \
-            --pattern souba_db.sqlite --dir せどり/データ/data --clobber \
-            || echo "相場DBがまだ無い"
+          if gh release download souba-db --repo ${{ github.repository }} \
+               --pattern souba_db.sqlite.gz --dir せどり/データ/data --clobber; then
+            gunzip -f せどり/データ/data/souba_db.sqlite.gz
+          else
+            echo "相場DBがまだ無い"
+          fi
 
       - name: 新方式の指紋づくり
         env:
@@ -72,5 +75,14 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release upload souba-db せどり/データ/data/souba_db.sqlite \
-            --repo ${{ github.repository }} --clobber || echo "アップロードするDBが無い"
+          # DBが無い/空の時にアップロードすると、正常なアセットを壊れたファイルで
+          # 上書き(--clobberは先に削除する)してしまうため、必ず存在確認してから行う。
+          if [ ! -s せどり/データ/data/souba_db.sqlite ]; then
+            echo "DBが無い/空のためアップロードをスキップ（既存アセットを守る）"; exit 0
+          fi
+          gzip -f -c せどり/データ/data/souba_db.sqlite > せどり/データ/data/souba_db.sqlite.gz
+          for i in 1 2 3; do
+            gh release upload souba-db せどり/データ/data/souba_db.sqlite.gz \
+              --repo ${{ github.repository }} --clobber && break
+            echo "アップロード失敗、10秒後に再試行 ($i/3)"; sleep 10
+          done

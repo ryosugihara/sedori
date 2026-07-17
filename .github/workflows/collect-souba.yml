@@ -43,9 +43,12 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p せどり/データ/data
-          gh release download souba-db --repo ${{ github.repository }} \
-            --pattern souba_db.sqlite --dir せどり/データ/data --clobber \
-            || echo "相場DBがまだ無い(初回)。新規作成します"
+          if gh release download souba-db --repo ${{ github.repository }} \
+               --pattern souba_db.sqlite.gz --dir せどり/データ/data --clobber; then
+            gunzip -f せどり/データ/data/souba_db.sqlite.gz
+          else
+            echo "相場DBがまだ無い(初回)。新規作成します"
+          fi
 
       - name: 相場を収集してDBに保存
         env:
@@ -60,9 +63,18 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # DBが無い/空の時にアップロードすると、正常なアセットを壊れたファイルで
+          # 上書き(--clobberは先に削除する)してしまうため、必ず存在確認してから行う。
+          if [ ! -s せどり/データ/data/souba_db.sqlite ]; then
+            echo "DBが無い/空のためアップロードをスキップ（既存アセットを守る）"; exit 0
+          fi
           gh release view souba-db --repo ${{ github.repository }} >/dev/null 2>&1 \
             || gh release create souba-db --repo ${{ github.repository }} \
                  --title "相場DB（自動更新）" \
-                 --notes "collect_souba.py が自動更新するメルカリ相場DB(souba_db.sqlite)。gitコミットではなくReleaseの添付ファイルとして保存（100MB上限回避）。"
-          gh release upload souba-db せどり/データ/data/souba_db.sqlite \
-            --repo ${{ github.repository }} --clobber
+                 --notes "collect_souba.py が自動更新するメルカリ相場DB。gitではなくReleaseの添付ファイル(souba_db.sqlite.gz)として保存。"
+          gzip -f -c せどり/データ/data/souba_db.sqlite > せどり/データ/data/souba_db.sqlite.gz
+          for i in 1 2 3; do
+            gh release upload souba-db せどり/データ/data/souba_db.sqlite.gz \
+              --repo ${{ github.repository }} --clobber && break
+            echo "アップロード失敗、10秒後に再試行 ($i/3)"; sleep 10
+          done
