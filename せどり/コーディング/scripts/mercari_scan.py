@@ -87,7 +87,9 @@ def try_match_and_send(raw, brand, souba, excludes, notified_before, stats, tag=
     """1商品を照合し、条件を満たせば即送信する。送信したらTrueを返す。"""
     if raw["id"] in notified_before:
         return False  # 前回までのスキャンで既に送信済み
-    if raw.get("condition_id") == 1:
+    # メルカリAPIは状態を文字列で返す('1'〜'6')ため str で比較する。
+    # ('1'=新品、未使用。中古せどりの対象外。以前は数値1と比較して常に不一致だった)
+    if str(raw.get("condition_id")) == "1":
         return False  # 新品未使用は中古せどりの対象外
     it = {
         "id": raw["id"],
@@ -205,7 +207,8 @@ def main():
             seen.add(raw["id"])
             if raw["id"] in notified_before:
                 continue  # 前回までのスキャンで既に送信済み
-            if raw.get("condition_id") == 1:
+            # メルカリAPIは状態を文字列で返す('1'〜'6')ため str で比較する。
+            if str(raw.get("condition_id")) == "1":
                 continue  # 新品未使用は中古せどりの対象外
             it = {
                 "id": raw["id"],

@@ -181,11 +181,12 @@ def main():
                         (it["updated"], it["id"]),
                     )
             # まだDBに無くて、取引が新しく（半年以内）、予約出品でも新品未使用でもない物だけを入れる
+            # ※メルカリAPIは状態を文字列で返す('1'=新品未使用)ため str で比較する
             fresh = [it for it in items
                      if it["id"] and it["id"] not in known
                      and not (it.get("updated") and it["updated"] < cutoff)
                      and not ("専用" in it.get("name", "") and len(it.get("name", "")) <= 15)
-                     and it.get("condition_id") != 1]
+                     and str(it.get("condition_id")) != "1"]
             print(f"  「{kw}」 取得{len(items)}件 / 新規{len(fresh)}件")
 
             for it in fresh:
