@@ -19,12 +19,15 @@
     "watch",
     "テーラードジャケット",
     "テーラード",
-    "新品未使用",
-    "新品、未使用",
-    "新品・未使用",
-    "未使用品",
+    "新品",
+    "未使用",
+    "タグ付",
+    "新品同様",
     "デッドストック",
-    "DEADSTOCK"
+    "DEADSTOCK",
+    "dead stock",
+    "brand new",
+    "unused"
   ],
   "price_rules": [
     {
@@ -34,7 +37,9 @@
     }
   ],
   "_ブランド別NGキーワードの説明": "このブランドの商品名にこの言葉が含まれていたら通知しない（全ブランド共通のng_keywordsとは別に、特定ブランドだけに効く）。テーラードジャケットは全ブランド共通で判別が難しいためng_keywordsに移動済み",
-  "brand_ng_keywords": {},
+  "brand_ng_keywords": {
+    "Saint Laurent": ["音符", "piano", "ピアノ"]
+  },
   "_ブランド別カテゴリ許可リストの説明": "このブランドで category_keywords のどれかに当てはまる商品は、allow_keywords のどれかも含んでいない限り通知しない（例: サンローランのバッグはリュック/バックパック以外は通知しない）",
   "brand_category_allowlist": {
     "Saint Laurent": {
