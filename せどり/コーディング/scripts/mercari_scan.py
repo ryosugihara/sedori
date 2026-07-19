@@ -13,6 +13,7 @@
 """
 
 import os
+import sys
 import time
 
 import monitor      # 通知・除外・設定の部品を再利用
@@ -139,8 +140,12 @@ def priority_loop():
     間に合わない『買い付け競争が起きやすいブランド』専用のループ。
     """
     if not souba_match.ready():
-        monitor.send_text("⚡ 優先スキャン中止：相場DBかAIの準備が揃っていません。")
-        return
+        # 相場DB(Release)が消えている等で準備が整わない時は、Discordに通知せず
+        # 異常終了(exit 1)する。ここで通知＋正常終了すると、ワークフローの
+        # 自動再起動(if:success)が1分ごとに走り、同じ中止メッセージを大量送信して
+        # しまう（実際に1957回の暴走が起きた）。exit 1 なら自動再起動が止まる。
+        print("優先スキャン中止：相場DBかAIの準備が整っていません（通知せず終了）")
+        sys.exit(1)
     souba = monitor.load_souba()
     excludes = monitor.load_excludes()
     notified_before = set(monitor.load_json_file(PRIORITY_SEEN_FILE, []))
@@ -149,8 +154,8 @@ def priority_loop():
     targets = load_priority_targets()
     print(f"優先スキャンループ開始: {[b for b, _ in targets]} / {poll_seconds}秒ごと・最長{loop_minutes}分")
     if not targets:
-        monitor.send_text("⚡ 優先スキャン中止：対象ブランドのキーワードがwatch_mercari.jsonにありません。")
-        return
+        print("優先スキャン中止：対象ブランドのキーワードがありません（通知せず終了）")
+        sys.exit(1)
 
     end_time = time.time() + loop_minutes * 60
     total_sent = 0
