@@ -56,9 +56,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p せどり/データ/data
-          if gh release download souba-db --repo ${{ github.repository }} \
-               --pattern souba_db.sqlite.gz --dir せどり/データ/data --clobber; then
-            gunzip -f せどり/データ/data/souba_db.sqlite.gz
+          if python せどり/コーディング/scripts/db_release.py download; then
+            echo "相場DBを取得しました"
           else
             echo "相場DBがまだ無い"
           fi
@@ -75,14 +74,5 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # DBが無い/空の時にアップロードすると、正常なアセットを壊れたファイルで
-          # 上書き(--clobberは先に削除する)してしまうため、必ず存在確認してから行う。
-          if [ ! -s せどり/データ/data/souba_db.sqlite ]; then
-            echo "DBが無い/空のためアップロードをスキップ（既存アセットを守る）"; exit 0
-          fi
-          gzip -f -c せどり/データ/data/souba_db.sqlite > せどり/データ/data/souba_db.sqlite.gz
-          for i in 1 2 3; do
-            gh release upload souba-db せどり/データ/data/souba_db.sqlite.gz \
-              --repo ${{ github.repository }} --clobber && break
-            echo "アップロード失敗、10秒後に再試行 ($i/3)"; sleep 10
-          done
+          # 分割保存(db_release.py)で安全に保存。DBが無い/空なら中で中止し既存を守る。
+          python せどり/コーディング/scripts/db_release.py upload

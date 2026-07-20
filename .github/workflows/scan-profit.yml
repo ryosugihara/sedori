@@ -45,9 +45,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p せどり/データ/data
-          if gh release download souba-db --repo ${{ github.repository }} \
-               --pattern souba_db.sqlite.gz --dir せどり/データ/data --clobber; then
-            gunzip -f せどり/データ/data/souba_db.sqlite.gz
+          if python せどり/コーディング/scripts/db_release.py download; then
+            echo "相場DBを取得しました"
           else
             echo "相場DBがまだ無い。画像判定なしで続行"
           fi
