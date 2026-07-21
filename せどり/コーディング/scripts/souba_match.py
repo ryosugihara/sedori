@@ -220,7 +220,7 @@ def match_item(item, souba, stats=None, min_profit=None):
         # 実例を採用する（AI確認は費用・レート制限のため上位2件までに絞る）。
         import geom_verify
         geo_th = int(souba.get("geo_inliers", 15))
-        color_th = float(souba.get("color_distance_th", 30))
+        color_hist_th = float(souba.get("color_hist_th", 0.55))
         raw_item = fingerprint.download_bytes(item["image"])
         if raw_item is None:
             _count("reason_その他_画像取得失敗")
@@ -246,10 +246,14 @@ def match_item(item, souba, stats=None, min_profit=None):
 
             # 幾何検証(ORB)は白黒画像で処理するため色を一切見ておらず、ステッチや
             # シルエットが似ているだけの色違い商品(黒デニム×紺デニム等)を誤って
-            # 合格させることがある。色が明らかに違う場合は、この実例は諦めて
-            # 次の候補を試す。
-            color_dist = geom_verify.color_distance(raw_item, raw_ref)
-            if color_dist is not None and color_dist > color_th:
+            # 合格させることがある。そこで『色の内訳(ヒストグラム)』で色を比べ、
+            # 明らかに色が違う実例はここで諦めて次の候補を試す。
+            # ※実測(同商品60組/別商品270組)で、しきい値0.55なら色違いの約88%を弾き
+            #   つつ同一商品は残せることを確認済み(color_check.py / 色比較テスト)。
+            #   平均1色を見る旧color_distanceは差し色(白地に赤/青ロゴ)を見分けられ
+            #   なかったため、分布で見るcolor_hist_distanceに置き換えた。
+            color_dist = geom_verify.color_hist_distance(raw_item, raw_ref)
+            if color_dist is not None and color_dist > color_hist_th:
                 continue
 
             inl = geom_verify.inlier_count(raw_item, raw_ref)
