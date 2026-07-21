@@ -62,6 +62,47 @@ def color_distance(raw_a, raw_b):
         return None
 
 
+def color_hist(raw, size=96, hbins=12, sbins=3, vbins=3, center=0.7):
+    """画像を『色の内訳ヒストグラム』にする（平均1色ではなく“分布”で色を捉える）。
+    HSVで 色相(H)×鮮やかさ(S)×明るさ(V) を粗いマスに分けて数える。
+      ・H があるので 赤/青/緑… の違いを捉える
+      ・V があるので 黒/白/グレー の違いも捉える（無彩色対策）
+      ・マスを粗くしてあるので、照明や影の多少の違いには鈍感（同じ商品は同じ色と見なす）
+      ・中心70%だけ見て背景の影響を減らす
+    """
+    import numpy as np  # noqa: F401
+    import cv2
+    arr = np.frombuffer(raw, dtype=np.uint8)
+    img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+    if img is None:
+        return None
+    img = cv2.resize(img, (size, size))
+    m = int(size * (1 - center) / 2)
+    img = img[m:size - m, m:size - m]
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+    hist = cv2.calcHist([hsv], [0, 1, 2], None, [hbins, sbins, vbins],
+                        [0, 180, 0, 256, 0, 256])
+    cv2.normalize(hist, hist)
+    return hist.flatten().astype("float32")
+
+
+def color_hist_distance(raw_a, raw_b):
+    """2枚の画像の『色の内訳』の違い(0=同じ〜1=全く違う)。None=判定不能。
+    平均1色を比べる color_distance より、差し色(白地に赤ロゴ/白地に青ロゴ)や
+    黒/紺の違いを捉えられる。色違いの別商品を弾くための本命の指標。
+    """
+    try:
+        import cv2
+        ha = color_hist(raw_a)
+        hb = color_hist(raw_b)
+        if ha is None or hb is None:
+            return None
+        return float(cv2.compareHist(ha, hb, cv2.HISTCMP_BHATTACHARYYA))
+    except Exception as e:
+        print(f"  色ヒストグラム比較に失敗: {e}")
+        return None
+
+
 def inlier_count(raw_a, raw_b):
     """2枚の画像の『幾何学的に一致する点の数』を返す（多い=同じ商品の可能性大）"""
     try:
