@@ -64,31 +64,52 @@ def main():
         rows = rows[:LIMIT]
     print(f"新方式の指紋づくり: 全{total}件 / 今回対象{len(rows)}件（時間上限{TIME_BUDGET_SEC // 60}分）")
 
+    # 画像ダウンロードは「計算している間に、次の画像を裏で先取り(prefetch)」する。
+    # こうするとネット待ちが計算時間の裏に隠れ、全体が速くなる。
+    # ※DBへの書き込みは今まで通りメインだけ・重いAI計算も1件ずつなので競合は起きない。
+    from concurrent.futures import ThreadPoolExecutor
+    PREFETCH = 8               # 何件先までダウンロードを先取りするか
+    pool = ThreadPoolExecutor(max_workers=4)  # 同時ダウンロード数（サイトに優しい範囲）
+    futures = {}
+
+    def submit(k):
+        if 0 <= k < len(rows):
+            futures[k] = pool.submit(fingerprint.download_bytes, rows[k][1])
+
+    for k in range(min(PREFETCH, len(rows))):
+        submit(k)
+
     start = time.time()
     done = 0
     fail = 0
-    for i, (iid, url) in enumerate(rows, 1):
+    for i in range(len(rows)):
         if time.time() - start > TIME_BUDGET_SEC:
             print("時間切れ。ここまで保存して次回に続ける")
             break
+        iid, url = rows[i]
         try:
-            v3, v4 = fingerprint.embed_image_url_v2(url)
-            if v3 is not None and v4 is not None:
-                con.execute(
-                    "UPDATE items SET vec3=?, vec4=? WHERE id=?",
-                    (v3.astype("float16").tobytes(), v4.astype("float16").tobytes(), iid),
-                )
-                done += 1
-            else:
+            raw = futures.pop(i).result()   # 先取りしておいた画像データ
+            submit(i + PREFETCH)            # 次の画像のダウンロードを補充
+            if raw is None:
                 fail += 1
+            else:
+                v3, v4 = fingerprint.embed_bytes_v2(raw)
+                if v3 is not None and v4 is not None:
+                    con.execute(
+                        "UPDATE items SET vec3=?, vec4=? WHERE id=?",
+                        (v3.astype("float16").tobytes(), v4.astype("float16").tobytes(), iid),
+                    )
+                    done += 1
+                else:
+                    fail += 1
         except Exception as e:
             print(f"  失敗 ({iid}): {e}")
             fail += 1
-        if i % COMMIT_EVERY == 0:
+        if (i + 1) % COMMIT_EVERY == 0:
             con.commit()
-            print(f"  進捗 {i}/{len(rows)}（成功{done}/失敗{fail}）")
-        time.sleep(0.05)
+            print(f"  進捗 {i + 1}/{len(rows)}（成功{done}/失敗{fail}）")
     con.commit()
+    pool.shutdown(wait=False)
 
     remaining = con.execute(
         "SELECT COUNT(*) FROM items WHERE (vec3 IS NULL OR vec4 IS NULL) "
