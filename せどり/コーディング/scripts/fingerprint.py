@@ -207,12 +207,18 @@ def embed_siglip(img):
     inputs = proc(images=img, return_tensors="pt")
     with torch.no_grad():
         feats = model.get_image_features(**inputs)
-    # このtransformers版の get_image_features は、プール済みの1本[1,1152]ではなく
-    # パッチ系列[1,729,1152]を返すことがある。そのまま保存すると1件1.6MBに膨張し
-    # DBを壊す原因になった（かつ照合にも使えない）。どの形でも特徴次元(末尾)を残して
-    # パッチを平均し、必ず1本の要約ベクトルにする。
-    v = feats.detach().numpy()
-    v = v.reshape(-1, v.shape[-1]).mean(axis=0)  # → [1152]
+    # このtransformers版の get_image_features は、テンソルではなく出力オブジェクト
+    # (BaseModelOutputWithPooling) を返す。以前は feats[0]=last_hidden_state の
+    # パッチ系列[1,729,1152] をそのまま保存し、1件1.6MBに膨張してDBを壊していた。
+    # 正しくは pooler_output が本来の1本の要約ベクトル[1,1152]なので、それを使う。
+    # (pooler が無い版では パッチ系列を平均して1本にフォールバック)
+    if getattr(feats, "pooler_output", None) is not None:
+        v = feats.pooler_output[0].detach().numpy()
+    elif getattr(feats, "last_hidden_state", None) is not None:
+        v = feats.last_hidden_state[0].detach().numpy().mean(axis=0)
+    else:
+        arr = np.asarray(feats)
+        v = arr.reshape(-1, arr.shape[-1]).mean(axis=0)
     return (v / (np.linalg.norm(v) + 1e-9)).astype("float32")
 
 
