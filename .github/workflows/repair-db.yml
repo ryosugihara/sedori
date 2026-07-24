@@ -1,0 +1,88 @@
+# 壊れたDB修復: SigLIP膨張バグで vec3 が1件1.6MB化しDBが19GBに膨張した。
+# 現DBを取得 → 壊れた vec3/vec4 を全消し(旧 vec/vec2 は温存) → VACUUMで圧縮 →
+# 正常サイズで保存し直す。GitHub上で実行するので大容量でも安全・認証もGITHUB_TOKEN。
+name: DB修復（壊れた指紋を除去）
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# 収集/バックフィルと同じ書き込みグループに入る。修復は最優先なので、
+# 実行中の収集/バックフィル（壊れたコードで動いている可能性がある）を止めてから走る。
+concurrency:
+  group: souba-db-write
+  cancel-in-progress: true
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: ディスクを空ける（大容量DBを扱うため）
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android \
+                      /opt/hostedtoolcache/CodeQL /usr/local/share/boost || true
+          df -h /
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 現在のDBを取得（分割を結合）
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python せどり/コーディング/scripts/db_release.py download
+          ls -la せどり/データ/data/ || true
+          df -h /
+
+      - name: 壊れた指紋(vec3/vec4)を除去して圧縮
+        run: |
+          python - <<'PY'
+          import sqlite3, os
+          db = "せどり/データ/data/souba_db.sqlite"
+          print("修復前サイズ:", os.path.getsize(db)//1024//1024, "MB")
+          con = sqlite3.connect(db)
+          n = con.execute("SELECT COUNT(*) FROM items").fetchone()[0]
+          cols = [r[1] for r in con.execute("PRAGMA table_info(items)")]
+          big = 0
+          if "vec3" in cols:
+              big = con.execute("SELECT COUNT(*) FROM items WHERE length(vec3) > 4096").fetchone()[0]
+          print(f"総件数 {n} / 巨大なvec3を持つ件数 {big}")
+          # 巨大ジャーナルを作らずに、壊れた新指紋だけ全消し（旧 vec/vec2 は温存）
+          con.execute("PRAGMA journal_mode=OFF")
+          if "vec3" in cols:
+              con.execute("UPDATE items SET vec3=NULL")
+          if "vec4" in cols:
+              con.execute("UPDATE items SET vec4=NULL")
+          con.commit()
+          # スキーマを保ったまま圧縮コピー
+          out = "せどり/データ/data/clean.db"
+          if os.path.exists(out):
+              os.remove(out)
+          con.execute("VACUUM INTO '%s'" % out)
+          con.close()
+          os.replace(out, db)
+          print("修復後サイズ:", os.path.getsize(db)//1024//1024, "MB")
+          # 健全性チェック
+          con = sqlite3.connect(db)
+          n2 = con.execute("SELECT COUNT(*) FROM items").fetchone()[0]
+          okv = con.execute("SELECT COUNT(*) FROM items WHERE vec IS NOT NULL AND vec2 IS NOT NULL").fetchone()[0]
+          con.close()
+          print(f"修復後 総件数 {n2} / 旧指紋(vec+vec2)あり {okv}")
+          assert n2 == n, "件数が変わってしまった"
+          assert os.path.getsize(db) < 2_000_000_000, "まだ大きすぎる"
+          PY
+          df -h /
+
+      - name: きれいなDBを保存（正常サイズ・古いゴミは自動削除）
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release view souba-db --repo ${{ github.repository }} >/dev/null 2>&1 || \
+            gh release create souba-db --repo ${{ github.repository }} --title "相場DB（自動更新）" --notes "メルカリ相場DB。分割保存。"
+          python せどり/コーディング/scripts/db_release.py upload
