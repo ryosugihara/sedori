@@ -1,0 +1,39 @@
+# 新方式(v2)の指紋サイズを1件だけ実測する。DB膨張(19GB)の原因が
+# 「指紋が巨大化していること」かどうかを確定させるための軽い診断。
+name: 指紋サイズ診断
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  vecsize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: 道具を入れる
+        run: |
+          pip install --quiet torch torchvision --index-url https://download.pytorch.org/whl/cpu
+          pip install --quiet transformers pillow numpy sentencepiece protobuf rembg onnxruntime
+      - name: 指紋サイズを測る
+        run: |
+          cd "せどり/コーディング/scripts"
+          python - <<'PY'
+          import numpy as np
+          import fingerprint
+          url = "https://static.mercdn.net/thumb/item/webp/m14880327318_1.jpg?1780098352"
+          raw = fingerprint.download_bytes(url)
+          print("画像バイト数:", len(raw) if raw else None)
+          v3, v4 = fingerprint.embed_bytes_v2(raw)
+          for name, v in [("vec3(SigLIP)", v3), ("vec4(DINOv2-large)", v4)]:
+              a = np.asarray(v)
+              b = a.astype("float16").tobytes()
+              print(f"{name}: shape={a.shape} 要素数={a.size} 保存バイト数={len(b)}")
+          print("=> 正常なら数千バイト。数十万〜MB級なら巨大化バグ確定。")
+          PY
