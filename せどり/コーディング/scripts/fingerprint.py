@@ -207,7 +207,12 @@ def embed_siglip(img):
     inputs = proc(images=img, return_tensors="pt")
     with torch.no_grad():
         feats = model.get_image_features(**inputs)
-    v = feats[0].numpy()
+    # このtransformers版の get_image_features は、プール済みの1本[1,1152]ではなく
+    # パッチ系列[1,729,1152]を返すことがある。そのまま保存すると1件1.6MBに膨張し
+    # DBを壊す原因になった（かつ照合にも使えない）。どの形でも特徴次元(末尾)を残して
+    # パッチを平均し、必ず1本の要約ベクトルにする。
+    v = feats.detach().numpy()
+    v = v.reshape(-1, v.shape[-1]).mean(axis=0)  # → [1152]
     return (v / (np.linalg.norm(v) + 1e-9)).astype("float32")
 
 

@@ -94,7 +94,10 @@ def main():
                 fail += 1
             else:
                 v3, v4 = fingerprint.embed_bytes_v2(raw)
-                if v3 is not None and v4 is not None:
+                # 安全弁: 指紋は本来1本(数千バイト)。異常に大きい物は保存しない
+                # （SigLIPが系列[729,1152]=1.6MBを返してDBを19GBに膨張させた事故の再発防止）。
+                if (v3 is not None and v4 is not None
+                        and v3.size <= 4096 and v4.size <= 4096):
                     con.execute(
                         "UPDATE items SET vec3=?, vec4=? WHERE id=?",
                         (v3.astype("float16").tobytes(), v4.astype("float16").tobytes(), iid),
