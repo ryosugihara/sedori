@@ -6,11 +6,19 @@
     import souba_match
     if souba_match.ready():
         m = souba_match.match_item(item, souba)
-        # m = {rank, best_sim, estimate, net, profit, count, ref_name, ref_price, ref_url}
+        # m = {rank, best_sim, estimate, net, profit,
+        #      price_safe, price_mid, price_strong, count, confidence,
+        #      ref_name, ref_price, ref_url}
 
 rank の意味:
   「同デザイン」… 類似度がとても高い＝ほぼ同じ見た目の商品が売れている
   「似た系統」  … そこそこ似ている＝参考程度の相場
+
+相場の出し方（price_model）:
+  似ている売却実例を最大30件集め、外れ値（極端に高い/安い実例）を除いてから
+  『安全(下から25%)／標準(中央値)／強気(下から75%)』の3つを出す。
+  利益の判定には『標準』を使う（souba.json の『相場_判定に使う値』で変更可）。
+  根拠の件数が『相場_最低件数』に満たない時は信頼度『低』として最安値で判定する。
 
 ※AIが入っていない環境でも監視が壊れないよう、失敗したら None を返すだけ。
 """
@@ -39,6 +47,90 @@ def _souba_days():
 def _norm_brand(name):
     """ブランド名を比較しやすい形にする（小文字＋英数字だけ）"""
     return re.sub(r"[^a-z0-9]", "", (name or "").lower())
+
+
+def _percentile(sorted_vals, pct):
+    """小さい順に並んだ値の『下から pct %』の位置の値を返す（numpy と同じ線形補間）。
+    例: [100, 200, 300, 400] の 25% → 175
+    """
+    n = len(sorted_vals)
+    if n == 1:
+        return float(sorted_vals[0])
+    pos = (n - 1) * pct / 100.0
+    lo = int(pos)
+    hi = min(lo + 1, n - 1)
+    frac = pos - lo
+    return sorted_vals[lo] + (sorted_vals[hi] - sorted_vals[lo]) * frac
+
+
+def price_model(prices, souba):
+    """売れた値段の集まりから、外れ値を除いて『安全／標準／強気』の3つの相場を出す。
+
+    やること:
+      1. 値段を並べて、四分位（下から25%=Q1、50%=中央値、75%=Q3）を求める
+      2. Q1〜Q3 の幅(IQR)の1.5倍より外にある値段を『外れ値』として捨てる
+         （まとめ売りで異常に高い実例や、ジャンク品で異常に安い実例を除くため。
+           件数が4件未満の時は外れ値の判断ができないので捨てない）
+      3. 残った値段でもう一度 Q1／中央値／Q3 を出し、
+           安全 = Q1（控えめに見た相場）
+           標準 = 中央値（ふつうに売れる相場）
+           強気 = Q3（高めに売れた相場）
+         とする
+      4. 根拠の件数から信頼度を付ける（最低件数に満たなければ『低』）
+      5. 利益の判定に使う値(estimate)を決める。設定『相場_判定に使う値』に従うが、
+         信頼度が『低』の時は強制的に一番安い実例の値段を使う（安全側に倒す）
+
+    返り値: {estimate, safe, mid, strong, n_raw, n_used, n_outliers, confidence}
+    prices が空なら None。
+    """
+    raw = sorted(int(p) for p in prices if p is not None and int(p) > 0)
+    if not raw:
+        return None
+    n_raw = len(raw)
+
+    # 外れ値の除去（4件以上ある時だけ）
+    kept = raw
+    if n_raw >= 4:
+        q1, q3 = _percentile(raw, 25), _percentile(raw, 75)
+        iqr = q3 - q1
+        lo, hi = q1 - 1.5 * iqr, q3 + 1.5 * iqr
+        kept = [p for p in raw if lo <= p <= hi]
+        if not kept:  # 念のため（全部外れ値になることは理屈上ないが）
+            kept = raw
+    n_used = len(kept)
+    n_outliers = n_raw - n_used
+
+    safe = int(_percentile(kept, 25))
+    mid = int(_percentile(kept, 50))
+    strong = int(_percentile(kept, 75))
+
+    # 信頼度: 根拠の件数で決める（souba.json で変えられる）
+    min_n = int(souba.get("price_min_count", 5))
+    good_n = int(souba.get("price_good_count", 10))
+    if n_used < min_n:
+        confidence = "低"
+    elif n_used < good_n:
+        confidence = "中"
+    else:
+        confidence = "高"
+
+    # 利益判定に使う値: 設定で 安全/標準/強気 を選べる。信頼度『低』なら最安値。
+    which = souba.get("price_basis", "標準")
+    if confidence == "低":
+        estimate = int(min(kept))
+    elif which == "安全":
+        estimate = safe
+    elif which == "強気":
+        estimate = strong
+    else:
+        estimate = mid
+
+    return {
+        "estimate": estimate,
+        "safe": safe, "mid": mid, "strong": strong,
+        "n_raw": n_raw, "n_used": n_used, "n_outliers": n_outliers,
+        "confidence": confidence,
+    }
 
 
 def ready():
@@ -166,9 +258,16 @@ def match_item(item, souba, stats=None, min_profit=None):
         if len(idx) == 0:
             _count("reason_類似度不足")
             return None
-        # 同一商品の判定が得意なDINOの点数が高い順に、最大5件
+        # 同一商品の判定が得意なDINOの点数が高い順に並べる。
+        #  - pool   … 相場(値段)の根拠に使う実例。上限 price_pool 件（既定30件）。
+        #             以前は5件固定だったが、件数が少ないと1件の偏った値段に
+        #             引っ張られるため、見つかった候補を幅広く使う。
+        #  - picked … 答え合わせ（幾何検証・AI確認）を試す実例。上位5件まで
+        #             （答え合わせは1件ごとに写真のDLと計算が必要で重いため）。
         idx = np.array(idx)
-        picked = list(idx[np.argsort(-sims_d[idx])][:5])
+        ordered = list(idx[np.argsort(-sims_d[idx])])
+        pool = ordered[:int(souba.get("price_pool", 30))]
+        picked = ordered[:5]
         _count("similar_found")  # 類似商品が見つかった件数
 
         i0 = picked[0]
@@ -181,10 +280,16 @@ def match_item(item, souba, stats=None, min_profit=None):
         # （繰り返し柄は幾何検証もAIも誤りやすいため、昇格の対象外にする）
         patterns = [p.lower() for p in souba.get("plain_patterns", [])]
 
-        # 予想相場は『控えめ』に見積もる（高いモデルに引っ張られて
-        # 利益を過大に出さないよう、安い方から2番目の売値を使う）
-        prices = sorted(rs[i][2] for i in picked)
-        estimate = int(prices[1] if len(prices) >= 3 else prices[0])
+        # 予想相場: 根拠の実例(pool)の値段から、外れ値を除いた四分位モデルで
+        # 『安全(Q1)／標準(中央値)／強気(Q3)』を出す（price_model 参照）。
+        # 以前は「上位5件のうち安い方から2番目」の1つの値段だけを使っていたが、
+        # 根拠が少なく、その1件が偏っていると相場を誤るため、分布で見る形に変えた。
+        pm = price_model([rs[i][2] for i in pool], souba)
+        if pm is None:
+            _count("reason_その他_相場計算失敗")
+            return None
+        estimate = pm["estimate"]
+        _count(f"confidence_{pm['confidence']}")  # 相場の信頼度(高/中/低)の内訳
 
         fee, ship = souba["fee"], souba["shipping"]
         net = int(estimate * (1 - fee) - ship)  # メルカリ手取り
@@ -293,10 +398,17 @@ def match_item(item, souba, stats=None, min_profit=None):
             "verified": verified,  # 二重確認に合格した方法
             "best_sim": best_d,   # 同一商品らしさ(DINO、一番似ていた候補の値)
             "clip_sim": best_c,   # 見た目の系統の近さ(CLIP、一番似ていた候補の値)
-            "estimate": estimate,
+            "estimate": estimate,   # 利益判定に使った相場（設定『相場_判定に使う値』）
             "net": net,
             "profit": profit,
-            "count": len(picked),
+            # 相場の内訳（通知で『安全／標準／強気』として見せる）
+            "price_safe": pm["safe"],      # 安全 = 下から25%(Q1)
+            "price_mid": pm["mid"],        # 標準 = 中央値
+            "price_strong": pm["strong"],  # 強気 = 下から75%(Q3)
+            "count": pm["n_used"],         # 相場の根拠にした実例の件数（外れ値を除いた後）
+            "count_raw": pm["n_raw"],      # 外れ値を除く前の件数
+            "outliers": pm["n_outliers"],  # 外れ値として捨てた件数
+            "confidence": pm["confidence"],  # 信頼度(高/中/低)。低なら最安値で判定している
             "ref_name": (r0[1] or "")[:40],
             "ref_price": r0[2],
             "ref_url": f"https://jp.mercari.com/item/{r0[0]}",

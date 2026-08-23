@@ -262,6 +262,11 @@ def load_souba():
         "geo_inliers": s.get("画像判定_幾何一致点数", 15),
         # 色の違い(Lab色空間の距離)がこれを超えたら別物として除外する
         "color_distance_th": s.get("画像判定_色距離", 30),
+        # 相場モデル（souba_match.price_model）の設定
+        "price_pool": s.get("相場_参照する実例の上限件数", 30),  # 値段の根拠に使う実例の最大数
+        "price_min_count": s.get("相場_最低件数", 5),          # これ未満なら信頼度『低』＝最安値で判定
+        "price_good_count": s.get("相場_十分件数", 10),        # これ以上なら信頼度『高』
+        "price_basis": s.get("相場_判定に使う値", "標準"),     # 利益判定に使う値: 安全/標準/強気
         "records": data.get("records", []),
     }
 
@@ -322,9 +327,26 @@ def profit_lines(item, souba):
         )
         if m.get("verified"):
             lines.append(f"✅ 二重確認済み: {m['verified']}")
-        lines.append(f"🎯 予想相場 ¥{m['estimate']:,} → 手取り ¥{m['net']:,}")
+        # 相場の内訳（安全/標準/強気）と根拠の件数・信頼度。
+        # 出品価格を決めるのは人なので、控えめな値だけでなく強気の値も見せる。
+        if m.get("price_mid") is not None:
+            conf = m.get("confidence", "")
+            conf_mark = {"高": "🟢", "中": "🟡", "低": "🔴"}.get(conf, "")
+            outl = f"・外れ値{m['outliers']}件除外" if m.get("outliers") else ""
+            lines.append(
+                f"📊 相場 安全¥{m['price_safe']:,} / 標準¥{m['price_mid']:,} / "
+                f"強気¥{m['price_strong']:,}"
+                f"（根拠{m['count']}件{outl}・信頼度{conf_mark}{conf}）"
+            )
+        lines.append(f"🎯 判定相場 ¥{m['estimate']:,} → 手取り ¥{m['net']:,}")
         if m["profit"] is not None:
             lines.append(f"💰 予想利益 約¥{m['profit']:,}")
+            # 安全側で見た時の利益も添える（強気でしか利益が出ない商品を見分けるため）
+            if m.get("price_safe") is not None and item.get("price_num"):
+                fee, ship = souba["fee"], souba["shipping"]
+                safe_profit = int(m["price_safe"] * (1 - fee) - ship) - item["price_num"]
+                if safe_profit < m["profit"]:
+                    lines.append(f"　（安全相場で見ると 約¥{safe_profit:,}）")
         lines.append(
             f"⬇️ 下の大きい写真＝メルカリで売れた実例 ¥{m['ref_price']:,}\n"
             f"　[{m['ref_name']}]({m['ref_url']})"
@@ -568,6 +590,16 @@ def write_scan_diagnostics(path, total_fetched, examined, stats, sent_count):
     ]
     for i, (name, n) in enumerate(ranking, start=1):
         lines.append(f"   {i}位 {name}: {n} 件")
+    # 相場の根拠件数が足りていたか（信頼度の内訳）。『低』が多いなら相場DBの
+    # 収集キーワードを増やすか、相場_最低件数を見直す目安になる
+    conf_h = stats.get("confidence_高", 0)
+    conf_m = stats.get("confidence_中", 0)
+    conf_l = stats.get("confidence_低", 0)
+    if conf_h + conf_m + conf_l:
+        lines.append(
+            f"8. 相場の信頼度（根拠の実例件数）: 高 {conf_h} 件 / 中 {conf_m} 件 / "
+            f"低 {conf_l} 件（低＝最安値で控えめに判定）"
+        )
 
     report = "\n".join(lines)
     os.makedirs("せどり/データ/recon", exist_ok=True)
