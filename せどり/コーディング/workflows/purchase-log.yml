@@ -1,0 +1,74 @@
+# 購入・売却の実績記録（通知で終わりではなく、実際に儲かっているかを追跡する）
+name: 購入・売却の記録
+
+on:
+  schedule:
+    - cron: "0 0 * * 1" # 毎週月曜 09:00 JST に集計レポートをDiscordへ
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "buy(購入記録) / sell(売却記録) / report(今すぐ集計を見る)"
+        default: "report"
+        required: true
+      url:
+        description: "商品ページのURL（buy/sellの時は必須。同じURLで紐付けます）"
+        default: ""
+        required: false
+      price:
+        description: "buyなら買値、sellなら売れた値段"
+        default: ""
+        required: false
+      title:
+        description: "商品名（buyの時。無くてもOK）"
+        default: ""
+        required: false
+      shop:
+        description: "店名（buyの時。無くてもOK）"
+        default: ""
+        required: false
+      brand:
+        description: "ブランド名（buyの時。無くてもOK）"
+        default: ""
+        required: false
+      predicted_profit:
+        description: "通知に表示されていた予想利益（buyの時。無くてもOK）"
+        default: ""
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  record:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: リポジトリを取得
+        uses: actions/checkout@v4
+
+      - name: Pythonを準備
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 記録・集計を実行
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          ACTION: ${{ github.event.inputs.action || 'report' }}
+          ITEM_URL: ${{ github.event.inputs.url }}
+          PRICE: ${{ github.event.inputs.price }}
+          ITEM_TITLE: ${{ github.event.inputs.title }}
+          ITEM_SHOP: ${{ github.event.inputs.shop }}
+          ITEM_BRAND: ${{ github.event.inputs.brand }}
+          PREDICTED_PROFIT: ${{ github.event.inputs.predicted_profit }}
+        run: python せどり/コーディング/scripts/purchases.py
+
+      - name: 記録を保存
+        if: always()
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add せどり/データ/state/purchases.json
+          git commit -m "購入・売却記録を更新 [skip ci]" || echo "変更なし"
+          git pull --rebase origin ${{ github.ref_name }} || true
+          git push || echo "push スキップ"

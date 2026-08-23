@@ -1,9 +1,11 @@
-# 在庫スキャン：②ブランドの「今ある出品」から利益が出そうな商品を1回だけ探して通知
-# （新着監視とは別。手動で実行する棚卸し用）
+# 在庫スキャン：監視中の全ブランド（①②区別なし）の「今ある出品」から
+# 利益が出そうな商品を1回だけ探して通知（新着監視とは別。手動で実行する棚卸し用）
 name: 在庫スキャン(利益さがし)
 
 on:
-  workflow_dispatch: # 手動で実行する
+  schedule:
+    - cron: "30 3 * * *" # 毎日1回・03:30 UTC = 日本時間 12:30（メルカリ内スキャンの後）
+  workflow_dispatch: # 手動でも実行できる
     inputs:
       scan_max:
         description: "通知する最大件数（多すぎ防止）"
@@ -11,12 +13,13 @@ on:
         required: false
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   scan:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 180 # 精度重視で1件ごとの照合(候補5件+AI確認)が重くなり90分では
+                         # 全在庫を見切れず打ち切られたため延長(メルカリ内スキャンと同じ)
     steps:
       - name: リポジトリを取得
         uses: actions/checkout@v4
@@ -37,6 +40,17 @@ jobs:
           pip install --quiet torch torchvision --index-url https://download.pytorch.org/whl/cpu
           pip install --quiet opencv-python-headless sentence-transformers pillow
 
+      - name: 相場DBをReleaseから取得（無ければ画像判定なしで続行）
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p せどり/データ/data
+          if python せどり/コーディング/scripts/db_release.py download; then
+            echo "相場DBを取得しました"
+          else
+            echo "相場DBがまだ無い。画像判定なしで続行"
+          fi
+
       - name: 在庫スキャンを実行
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
@@ -44,4 +58,14 @@ jobs:
           SCAN_MAX: ${{ github.event.inputs.scan_max || '30' }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }} # 無料AIのカギ(あれば最終確認に使う)
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }} # 有料AIのカギ(任意)
-        run: python scripts/monitor.py
+        run: python せどり/コーディング/scripts/monitor.py
+
+      - name: 送信済み記録を保存
+        if: always()
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add せどり/データ/state/scan_profit_seen.json せどり/データ/recon
+          git commit -m "在庫スキャン: 送信済み記録を更新 [skip ci]" || echo "変更なし"
+          git pull --rebase origin ${{ github.ref_name }} || true
+          git push || echo "push スキップ"

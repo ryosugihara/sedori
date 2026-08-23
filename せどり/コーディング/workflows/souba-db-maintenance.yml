@@ -1,0 +1,77 @@
+# 相場DBの掃除だけを行う（手動起動のみ。メルカリには一切アクセスしない）
+#
+# いつ使うか:
+#   souba.json の『相場DB_除外キーワード』や『相場参照期間_日』を変えた後、
+#   次の収集日（毎月1日・15日）を待たずにDBへ反映したい時。
+# 何をするか:
+#   Release から相場DBを取得 → 商品名・状態ランクだけを見て不要な実例を消す →
+#   Release に保存し直す。メルカリの検索APIも画像サーバーも呼ばないので、
+#   何回動かしてもメルカリ側の負荷にはならない。
+name: 相場DBメンテナンス（掃除のみ）
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# 相場DBを書き換える処理(収集・指紋アップグレード・掃除)どうしが同時に走らないようにする
+concurrency:
+  group: souba-db-write
+  cancel-in-progress: false
+
+jobs:
+  maintenance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: リポジトリを取得
+        uses: actions/checkout@v4
+
+      - name: Pythonを準備
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 相場DBをReleaseから取得
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p せどり/データ/data
+          if python せどり/コーディング/scripts/db_release.py download; then
+            echo "相場DBを取得しました"
+          else
+            echo "相場DBがまだ無いため中止します（先に『メルカリ相場DB収集』を動かしてください）"
+            exit 0
+          fi
+
+      - name: DBを掃除（まとめ売り・ジャンク・新品・古い取引を除外）
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: python せどり/コーディング/scripts/souba_db_maintenance.py
+
+      - name: 掃除後の相場DBをReleaseに保存
+        # 途中で失敗してもmanifestを最後に更新するので、古いDBは壊れない（db_release.py）
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -s "せどり/データ/data/souba_db.sqlite" ]; then
+            python せどり/コーディング/scripts/db_release.py upload
+          else
+            echo "DBが無いため保存はスキップ"
+          fi
+
+      - name: レポートを保存
+        if: always()
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add せどり/データ/recon/SOUBA_DB_MAINTENANCE.txt || true
+          if git diff --cached --quiet; then
+            echo "変更なし"
+          else
+            git commit -m "相場DBメンテナンス: レポートを保存 [skip ci]"
+            git pull --rebase || true
+            git push || echo "push失敗（次回に再試行）"
+          fi

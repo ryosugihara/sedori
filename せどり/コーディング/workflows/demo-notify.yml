@@ -23,4 +23,4 @@ jobs:
       - name: デモ通知を送信
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-        run: python scripts/demo_notify.py
+        run: python せどり/コーディング/scripts/demo_notify.py

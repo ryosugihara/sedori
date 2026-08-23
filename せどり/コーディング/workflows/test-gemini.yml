@@ -7,7 +7,7 @@ on:
     branches:
       - claude/adoring-bell-7rqznj
     paths:
-      - "scripts/test_gemini.py"
+      - "せどり/コーディング/scripts/test_gemini.py"
       - ".github/workflows/test-gemini.yml"
 
 permissions:
@@ -26,9 +26,20 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: 相場DBをReleaseから取得
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p せどり/データ/data
+          if python せどり/コーディング/scripts/db_release.py download; then
+            echo "相場DBを取得しました"
+          else
+            echo "相場DBがまだ無い"
+          fi
+
       - name: テストを実行
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: python scripts/test_gemini.py
+        run: python せどり/コーディング/scripts/test_gemini.py

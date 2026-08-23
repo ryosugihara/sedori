@@ -1,0 +1,46 @@
+# ブランド発見スキャン：起点ブランドをよく売る出品者から、他に扱っているブランドの候補を探す
+# （自動では監視リストに追加しない。候補一覧をDiscordに送るだけ）
+name: ブランド発見スキャン
+
+on:
+  workflow_dispatch:
+    inputs:
+      seed_keywords:
+        description: "起点キーワード（改行区切り。空なら既定：アルマーニ/ディーゼル/バルマン）"
+        default: ""
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: リポジトリを取得
+        uses: actions/checkout@v4
+
+      - name: Pythonを準備
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 必要ライブラリを入れる
+        run: pip install pyjwt cryptography
+
+      - name: ブランド発見スキャンを実行
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          SEED_KEYWORDS: ${{ github.event.inputs.seed_keywords }}
+        run: python せどり/コーディング/scripts/discover_brands.py
+
+      - name: 結果を保存
+        if: always()
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add せどり/データ/recon
+          git commit -m "ブランド発見スキャン結果を保存 [skip ci]" || echo "変更なし"
+          git pull --rebase origin ${{ github.ref_name }} || true
+          git push || echo "push スキップ"

@@ -8,7 +8,7 @@ on:
     branches:
       - claude/adoring-bell-7rqznj # ← このブランチに更新があったら自動で実行
     paths:
-      - "scripts/recon.py" # recon.py か
+      - "せどり/コーディング/scripts/recon.py" # recon.py か
       - ".github/workflows/recon.yml" # このワークフローが変わった時だけ動かす
 
 # このワークフローがリポジトリに結果を書き込めるようにする
@@ -34,13 +34,13 @@ jobs:
       - name: 接続テストを実行
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-        run: python scripts/recon.py
+        run: python せどり/コーディング/scripts/recon.py
 
       # 4. 取得した結果(recon フォルダ)をリポジトリに保存する
       - name: 結果を保存
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@users.noreply.github.com"
-          git add recon
+          git add せどり/データ/recon
           git commit -m "接続テスト結果を保存" || echo "変更なし"
           git push

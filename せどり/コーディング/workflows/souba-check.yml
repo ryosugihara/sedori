@@ -32,4 +32,4 @@ jobs:
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           KEYWORD: ${{ github.event.inputs.keyword }}
-        run: python scripts/mercari.py
+        run: python せどり/コーディング/scripts/mercari.py

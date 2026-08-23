@@ -167,6 +167,18 @@ def _load():
     ).fetchall()
     con.close()
 
+    # まとめ売り・ジャンク・新品など「中古1点の相場にならない実例」を外す。
+    # DB側の掃除（collect_souba / souba_db_maintenance）が済む前でも効くよう、
+    # 読み込み時にも同じ基準で弾く（保険）。
+    try:
+        import souba_clean
+        before = len(rows)
+        rows = [r for r in rows if souba_clean.exclude_reason(r[1]) is None]
+        if before - len(rows):
+            print(f"  相場に使わない実例を除外: {before - len(rows)}件（まとめ売り・ジャンク・新品等）")
+    except Exception as e:
+        print(f"  除外キーワードの読み込みに失敗（全件を使います）: {e}")
+
     def to_mat(blobs):
         mat = np.stack([np.frombuffer(b, dtype=np.float16).astype("float32")
                         for b in blobs])
@@ -373,11 +385,17 @@ def match_item(item, souba, stats=None, min_profit=None):
                 continue
             ai_tries += 1
             import verify_ai
-            v = verify_ai.same_product(
+            # AIは「一致度(0〜100点)＋理由」で答える（verify_ai.py）。
+            # 点数の合格ラインは souba.json の『AI確認_同じと判定する点数』。
+            # 理由は recon/AI_VERIFY_LOG.txt に残るので、落ちた原因を後で見返せる。
+            ai = verify_ai.same_product_detail(
                 item["image"], rs[ci][5],
                 item.get("title", ""), rs[ci][1] or "") if verify_ai.available() else None
+            v = ai["verdict"] if ai else None
             if v == "same":
-                verified = "AIが写真を見比べて確認"
+                score = ai.get("score")
+                verified = (f"AIが写真を見比べて確認（一致度{score}点）"
+                            if score is not None else "AIが写真を見比べて確認")
                 verified_i = ci
                 verified_rank = "似た系統" if capped_c else cand_rank
                 break

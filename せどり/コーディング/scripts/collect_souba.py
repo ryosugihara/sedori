@@ -10,6 +10,7 @@
 
 ポイント:
   - すでにDBにある商品はスキップ（2回目からは新しく売れた分だけ＝速い）
+  - まとめ売り・ジャンク・新品など相場に使わない実例は入れない（souba_clean.py）
   - メルカリには1.5秒間隔でしかアクセスしない（優しく・ブロック回避）
   - 画像そのものは保存しない（指紋だけ保存→リポジトリが太らない）
 """
@@ -23,6 +24,7 @@ import urllib.request
 
 import mercari      # メルカリ検索の部品
 import fingerprint  # 画像の指紋化の部品
+import souba_clean  # 相場に使わない実例（まとめ売り・ジャンク等）を弾く部品
 
 DB_FILE = "せどり/データ/data/souba_db.sqlite"
 CONF_FILE = "せどり/データ/watchlists/watch_mercari.json"
@@ -152,6 +154,12 @@ def main():
     if brand_new:
         con.commit()
         print(f"新品未使用 {brand_new} 件をDBから削除しました（中古相場のみ残す）")
+    # まとめ売り・ジャンク・箱のみ・商品名に「新品」等、ふつうの中古1点の値段と違う
+    # 実例を消す（言葉の一覧は souba.json の『相場DB_除外キーワード』）。
+    # 手元のDBの商品名を見るだけで、メルカリにはアクセスしない。
+    cleaned = souba_clean.cleanse_db(con)
+    if cleaned:
+        print(f"相場に使わない実例を削除: {souba_clean.format_counts(cleaned)}")
     # 相場は変動するので、古い取引（既定：半年より前）はDBから消す
     days = souba_days()
     cutoff = int(time.time()) - days * 86400
@@ -180,14 +188,21 @@ def main():
                         "UPDATE items SET updated=? WHERE id=? AND updated IS NULL",
                         (it["updated"], it["id"]),
                     )
-            # まだDBに無くて、取引が新しく（半年以内）、予約出品でも新品未使用でもない物だけを入れる
-            # ※メルカリAPIは状態を文字列で返す('1'=新品未使用)ため str で比較する
-            fresh = [it for it in items
-                     if it["id"] and it["id"] not in known
-                     and not (it.get("updated") and it["updated"] < cutoff)
-                     and not ("専用" in it.get("name", "") and len(it.get("name", "")) <= 15)
-                     and str(it.get("condition_id")) != "1"]
-            print(f"  「{kw}」 取得{len(items)}件 / 新規{len(fresh)}件")
+            # まだDBに無くて、取引が新しく（半年以内）、相場に使える物だけを入れる。
+            # 予約出品・新品未使用・まとめ売り・ジャンク等は souba_clean.exclude_reason で
+            # 弾く（弾いた物は指紋化しないので、写真のダウンロードも発生しない）。
+            fresh, skipped = [], 0
+            for it in items:
+                if not it["id"] or it["id"] in known:
+                    continue
+                if it.get("updated") and it["updated"] < cutoff:
+                    continue
+                if souba_clean.exclude_reason(it.get("name", ""), it.get("condition_id")):
+                    skipped += 1
+                    continue
+                fresh.append(it)
+            print(f"  「{kw}」 取得{len(items)}件 / 新規{len(fresh)}件"
+                  + (f"（相場に使わない実例 {skipped}件は除外）" if skipped else ""))
 
             for it in fresh:
                 vec, vec2 = None, None

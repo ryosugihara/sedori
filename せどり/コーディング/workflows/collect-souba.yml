@@ -9,15 +9,15 @@ on:
 permissions:
   contents: write
 
-# 収集どうしがぶつからないようにする
+# 相場DBを書き換える処理(収集・指紋アップグレード)どうしが同時に走らないようにする
 concurrency:
-  group: collect-souba
+  group: souba-db-write
   cancel-in-progress: false
 
 jobs:
   collect:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 300
     steps:
       - name: リポジトリを取得
         uses: actions/checkout@v4
@@ -38,17 +38,34 @@ jobs:
           pip install --quiet torch torchvision --index-url https://download.pytorch.org/whl/cpu
           pip install --quiet opencv-python-headless sentence-transformers pillow pyjwt cryptography
 
+      - name: 相場DBをReleaseから取得（前回までの分。無ければ新規作成として続行）
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p せどり/データ/data
+          if python せどり/コーディング/scripts/db_release.py download; then
+            echo "相場DBを取得しました"
+          else
+            echo "相場DBがまだ無い(初回)。新規作成します"
+          fi
+
       - name: 相場を収集してDBに保存
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-        run: python scripts/collect_souba.py
+        run: python せどり/コーディング/scripts/collect_souba.py
 
-      - name: DBをリポジトリに保存
+      - name: 相場DBをReleaseに保存
+        # gitには入れない: DBは100MB近く・増え続けるためGitHubの1ファイル100MB上限に
+        # ぶつかる（コミットのたびにリポジトリ履歴も太る）。Releaseの添付ファイルなら
+        # 実質2GBまで扱え、履歴も汚さない。
         if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          git config user.name "github-actions"
-          git config user.email "github-actions@users.noreply.github.com"
-          git add data/souba_db.sqlite
-          git commit -m "メルカリ相場DBを更新 [skip ci]" || echo "変更なし"
-          git pull --rebase origin ${{ github.ref_name }} || true
-          git push || echo "push スキップ"
+          # 分割保存(db_release.py)で安全に保存。DBが無い/空なら中で中止し既存を守る。
+          # 途中で失敗してもmanifestを最後に更新するので、古いDBは壊れない。
+          gh release view souba-db --repo ${{ github.repository }} >/dev/null 2>&1 \
+            || gh release create souba-db --repo ${{ github.repository }} \
+                 --title "相場DB（自動更新）" \
+                 --notes "メルカリ相場DB。分割して保存(part + souba_db_manifest.json)。"
+          python せどり/コーディング/scripts/db_release.py upload

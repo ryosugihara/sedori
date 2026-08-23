@@ -23,4 +23,4 @@ jobs:
       - name: テスト通知を送信
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-        run: python scripts/test_notify.py
+        run: python せどり/コーディング/scripts/test_notify.py

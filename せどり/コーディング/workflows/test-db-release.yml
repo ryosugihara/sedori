@@ -1,0 +1,47 @@
+# DB分割保存(db_release.py)が安全に往復できるかのテスト。
+# 本番の souba-db には一切触れず、テスト用タグ souba-db-test で検証する。
+name: DB分割保存テスト
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: 分割保存の往復テスト
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          # テスト用リリースを用意
+          gh release view souba-db-test --repo ${{ github.repository }} >/dev/null 2>&1 || \
+            gh release create souba-db-test --repo ${{ github.repository }} \
+              --title "DB分割保存テスト用" --notes "自動テスト用。中身は一時的。"
+          # 本番の単一DBを取得してテストデータにする（読むだけ）
+          mkdir -p せどり/データ/data
+          gh release download souba-db --repo ${{ github.repository }} \
+            --pattern souba_db.sqlite.gz --dir せどり/データ/data --clobber
+          gunzip -f せどり/データ/data/souba_db.sqlite
+          BEFORE=$(python -c "import sqlite3;print(sqlite3.connect('せどり/データ/data/souba_db.sqlite').execute('select count(*) from items').fetchone()[0])")
+          echo "元のDB件数: $BEFORE"
+          # テストタグへ『分割アップロード』
+          SOUBA_DB_TAG=souba-db-test python せどり/コーディング/scripts/db_release.py upload
+          # ローカルDBを消して、テストタグから『分割ダウンロード＋結合』で復元
+          rm -f せどり/データ/data/souba_db.sqlite
+          SOUBA_DB_TAG=souba-db-test python せどり/コーディング/scripts/db_release.py download
+          AFTER=$(python -c "import sqlite3;print(sqlite3.connect('せどり/データ/data/souba_db.sqlite').execute('select count(*) from items').fetchone()[0])")
+          echo "復元後のDB件数: $AFTER"
+          if [ -n "$AFTER" ] && [ "$BEFORE" = "$AFTER" ]; then
+            echo "✅ 分割保存テスト成功：$AFTER 件が完全に往復できました"
+          else
+            echo "❌ テスト失敗（件数不一致 before=$BEFORE after=$AFTER）"; exit 1
+          fi
