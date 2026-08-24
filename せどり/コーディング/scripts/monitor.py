@@ -185,17 +185,33 @@ def git_save_state():
             ["git", "config", "user.email", "github-actions@users.noreply.github.com"],
             check=False,
         )
-        subprocess.run(["git", "add", "state"], check=False)
+        # 実行中に書き換わったログ類(recon)は、ここではコミットしない。
+        # コミットしない変更が残っていると後の pull --rebase が失敗し、
+        # 記録を保存できず「同じ商品を再通知し続ける」原因になるため捨てる
+        # （ログは毎日のスキャン系ワークフローが自分の分を保存する）。
+        subprocess.run(["git", "checkout", "--", "せどり/データ/recon"],
+                       capture_output=True)
+        # ※以前はここが「git add state」という存在しないパスで、コミットが
+        #   毎回失敗→即時保存が一度も動いていなかった（再通知の主原因）。
+        subprocess.run(["git", "add", "せどり/データ/state"], check=False)
         r = subprocess.run(
             ["git", "commit", "-m", "新着監視: 状態を更新 [skip ci]"],
             capture_output=True,
         )
         if r.returncode != 0:
             return  # 変更が無ければ何もしない
-        if branch:
-            subprocess.run(["git", "pull", "--rebase", "origin", branch], check=False)
-        subprocess.run(["git", "push"], capture_output=True)
-        print("  状態をサーバーに保存しました")
+        # 他のワークフローが先に保存していても衝突しないよう、取り込んでから押す。
+        # 失敗したら少し待ってもう一度（--autostash は未保存の変更があっても動く）
+        for attempt in (1, 2, 3):
+            if branch:
+                subprocess.run(["git", "pull", "--rebase", "--autostash",
+                                "origin", branch], capture_output=True)
+            p = subprocess.run(["git", "push"], capture_output=True)
+            if p.returncode == 0:
+                print("  状態をサーバーに保存しました")
+                return
+            time.sleep(5)
+        print("  状態の保存(push)に3回失敗しました（次の保存で再試行されます）")
     except Exception as e:
         print(f"  状態の保存(push)に失敗: {e}")
 

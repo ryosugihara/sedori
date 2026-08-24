@@ -75,11 +75,19 @@ jobs:
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@users.noreply.github.com"
+          # コミットしないログ(recon)の変更が残っていると pull --rebase が失敗し、
+          # 記録を保存できず「同じ商品を再通知し続ける」原因になるため先に捨てる
+          git checkout -- せどり/データ/recon 2>/dev/null || true
           git add せどり/データ/state
-          # 変化があった時だけ記録する
           git commit -m "新着監視: 状態を更新 [skip ci]" || { echo "変更なし"; exit 0; }
-          git pull --rebase origin ${{ github.ref_name }} || true
-          git push || echo "push をスキップしました"
+          # 他のワークフローが先に保存していても衝突しないよう、取り込んでから押す。
+          # 失敗したら2回まで再試行（保存に失敗すると同じ商品を再通知してしまうため）
+          for i in 1 2 3; do
+            git pull --rebase --autostash origin ${{ github.ref_name }} || true
+            git push && exit 0
+            echo "push失敗 ($i/3) → 5秒待って再試行"; sleep 5
+          done
+          echo "::warning::状態の保存(push)に失敗しました。次回実行で再通知が起きる可能性があります"
 
       - name: 次の監視を自動で開始（PATがある時だけ）
         if: success() # 正常に終わった時だけ（クラッシュ時の連続再起動を防ぐ）
