@@ -285,22 +285,31 @@ def _log(result, url_a, url_b, title_a, title_b):
         pass
 
 
+# 直前の呼び出しが失敗した理由（テスト・診断で「なぜ失敗したか」を数えるために使う）
+LAST_ERROR = None
+
+
 def same_product_detail(url_a, url_b, title_a="", title_b=""):
     """写真2枚が同じ商品かAIに聞き、点数と理由つきで返す。
     返り値: {verdict, score, reason, differences} / None(エラー・カギ無し)
       verdict: "same" / "different" / "unsure"
     """
+    global LAST_ERROR
     try:
         if os.environ.get("GEMINI_API_KEY", "").strip():
             result = _ask_gemini(url_a, url_b, title_a, title_b)
         elif os.environ.get("ANTHROPIC_API_KEY", "").strip():
             result = _ask_claude(url_a, url_b, title_a, title_b)
         else:
+            LAST_ERROR = "カギ未設定"
             return None
+        LAST_ERROR = None
         _log(result, url_a, url_b, title_a, title_b)
         return result
     except Exception as e:
-        print(f"  AI最終確認に失敗: {e}")
+        # エラーの種類と中身の先頭だけを覚える（カギの値そのものは含まれない）
+        LAST_ERROR = f"{type(e).__name__}: {str(e)[:120]}"
+        print(f"  AI最終確認に失敗: {LAST_ERROR}")
         return None
 
 

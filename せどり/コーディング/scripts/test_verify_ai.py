@@ -77,8 +77,29 @@ def main():
     random.seed(7)  # 毎回同じ選び方になるように（結果を再現できる）
     pos, neg = [], []   # (点数, 判定, カテゴリ, 商品名A, URL A, 商品名B, URL B, 結論)
     calls = 0
+    fails = {}          # 失敗の理由 → 回数（原因調査のためレポートに残す）
+    fail_streak = [0]   # 連続失敗の数。続くようなら無駄撃ちせず中断する
+    aborted = [False]
+
+    def record(r):
+        """AIの返事を記録する。点数が取れたらTrue。失敗理由は fails に数える"""
+        if r and r.get("score") is not None:
+            fail_streak[0] = 0
+            return True
+        if r is None:
+            reason = verify_ai.LAST_ERROR or "不明なエラー"
+        else:
+            reason = f"点数なし: {r.get('reason', '')[:60]}"
+        fails[reason] = fails.get(reason, 0) + 1
+        fail_streak[0] += 1
+        if fail_streak[0] >= 8:
+            aborted[0] = True  # 8回連続で失敗＝原因が直らない限り続けても無駄
+        return False
 
     for kw, cat in KEYWORDS:
+        if aborted[0]:
+            print("連続失敗が続いたため、以降のキーワードを中断します")
+            break
         try:
             items = mercari.fetch_sold(kw)
         except Exception as e:
@@ -106,13 +127,13 @@ def main():
 
         # 同じ商品ペア（写真1枚目 vs 2枚目）
         for it, photos in multi:
-            if calls >= MAX_AI_CALLS:
+            if calls >= MAX_AI_CALLS or aborted[0]:
                 break
             url = f"https://jp.mercari.com/item/{it['id']}"
             r = verify_ai.same_product_detail(
                 photos[0], photos[1], it["name"], it["name"])
             calls += 1
-            if r and r.get("score") is not None:
+            if record(r):
                 pos.append((r["score"], r["verdict"], cat, it["name"], url, it["name"], url,
                             r.get("reason", "")))
                 print(f"  同商品 {r['score']:3d}点 {r['verdict']:9s} {it['name'][:30]}")
@@ -123,14 +144,14 @@ def main():
         combos = [(i, j) for i in range(len(multi)) for j in range(i + 1, len(multi))]
         random.shuffle(combos)
         for i, j in combos[:len(multi)]:
-            if calls >= MAX_AI_CALLS:
+            if calls >= MAX_AI_CALLS or aborted[0]:
                 break
             (a, pa), (b, pb) = multi[i], multi[j]
             ua, ub = (f"https://jp.mercari.com/item/{a['id']}", f"https://jp.mercari.com/item/{b['id']}")
             r = verify_ai.same_product_detail(
                 pa[0], pb[0], a["name"], b["name"])
             calls += 1
-            if r and r.get("score") is not None:
+            if record(r):
                 neg.append((r["score"], r["verdict"], cat, a["name"], ua, b["name"], ub,
                             r.get("reason", "")))
                 print(f"  別商品 {r['score']:3d}点 {r['verdict']:9s} {a['name'][:20]} / {b['name'][:20]}")
@@ -148,7 +169,14 @@ def main():
     same_th, diff_th = verify_ai._thresholds()
 
     lines = [f"最終確認AIの点数 精度測定  同じ商品ペア {len(pos)}組 / 違う商品ペア {len(neg)}組"
-             f"（AI呼び出し {calls}回）", ""]
+             f"（AI呼び出し {calls}回・うち失敗 {sum(fails.values())}回）", ""]
+    if fails:
+        lines.append("【測定できなかった呼び出しの内訳】")
+        for reason, n in sorted(fails.items(), key=lambda x: -x[1]):
+            lines.append(f"  {n}回: {reason}")
+        if aborted[0]:
+            lines.append("  ※失敗が8回連続したため途中で中断した")
+        lines.append("")
     lines.append("【点数の分布】")
     lines.append(f"  同じ商品:  最低 {pct(ps, 0)} / 25% {pct(ps, 25)} / 中央 {pct(ps, 50)} / "
                  f"75% {pct(ps, 75)} / 最高 {pct(ps, 100)}")
