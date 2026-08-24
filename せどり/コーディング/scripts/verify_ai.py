@@ -207,34 +207,53 @@ def _ask_gemini(url_a, url_b, title_a, title_b):
     key = os.environ["GEMINI_API_KEY"].strip()
     body = json.dumps(payload).encode("utf-8")
 
-    # 動くモデルが分かっていればそれだけ、まだなら候補を上から順に試す
-    models = [_gemini_model] if _gemini_model else GEMINI_MODELS
+    # 動くと分かっているモデルを先頭に、他の候補も後ろに並べて順に試す
+    # （回数制限(429)はモデルごとに別枠のことがあるため、固定せず他も試す）
+    if _gemini_model:
+        models = [_gemini_model] + [m for m in GEMINI_MODELS if m != _gemini_model]
+    else:
+        models = list(GEMINI_MODELS)
     last_err = None
+    retried_wait = False  # 「何秒待て」の指示に従った再試行は1回だけ（待ちすぎ防止）
     for model in models:
         req = urllib.request.Request(
             f"{GEMINI_BASE}/{model}:generateContent?key={key}",
             data=body, method="POST",
             headers={"Content-Type": "application/json"})
-        try:
-            with urllib.request.urlopen(req, timeout=90) as res:
-                data = json.loads(res.read().decode("utf-8"))
-            if _gemini_model != model:
-                _gemini_model = model
-                print(f"  Gemini: モデル {model} を使用")
-            parts = (data.get("candidates") or [{}])[0].get(
-                "content", {}).get("parts", [])
-            return _parse("".join(p.get("text", "") for p in parts))
-        except urllib.error.HTTPError as e:
-            detail = ""
+        for attempt in (1, 2):
             try:
-                detail = e.read().decode("utf-8", "replace")[:200]
-            except Exception:
-                pass
-            print(f"  Gemini {model}: {e.code} {detail[:120]}")
-            last_err = e
-            if e.code in (404, 429):
-                continue  # このモデルは使えない→次の候補へ
-            raise
+                with urllib.request.urlopen(req, timeout=90) as res:
+                    data = json.loads(res.read().decode("utf-8"))
+                if _gemini_model != model:
+                    _gemini_model = model
+                    print(f"  Gemini: モデル {model} を使用")
+                parts = (data.get("candidates") or [{}])[0].get(
+                    "content", {}).get("parts", [])
+                return _parse("".join(p.get("text", "") for p in parts))
+            except urllib.error.HTTPError as e:
+                detail = ""
+                try:
+                    detail = e.read().decode("utf-8", "replace")[:300]
+                except Exception:
+                    pass
+                print(f"  Gemini {model}: {e.code} {detail[:120]}")
+                last_err = e
+                if e.code == 429 and attempt == 1 and not retried_wait:
+                    # 返答に「retryDelay: Xs（X秒後に再試行して）」が入っていれば従う。
+                    # 1分あたりの制限ならこれで通る。1日の上限なら待っても無駄なので
+                    # 70秒を超える指示や2回目は諦めて次のモデルへ。
+                    m = re.search(r'"retryDelay"\s*:\s*"(\d+)', detail)
+                    wait_s = int(m.group(1)) if m else 0
+                    if 0 < wait_s <= 70:
+                        print(f"  Gemini: {wait_s}秒待って再試行します")
+                        time.sleep(wait_s)
+                        retried_wait = True
+                        continue
+                if e.code in (404, 429):
+                    break  # このモデルは使えない→次の候補へ
+                raise
+        else:
+            continue
     raise last_err
 
 
@@ -295,14 +314,24 @@ def same_product_detail(url_a, url_b, title_a="", title_b=""):
       verdict: "same" / "different" / "unsure"
     """
     global LAST_ERROR
+    has_gemini = bool(os.environ.get("GEMINI_API_KEY", "").strip())
+    has_claude = bool(os.environ.get("ANTHROPIC_API_KEY", "").strip())
+    if not has_gemini and not has_claude:
+        LAST_ERROR = "カギ未設定"
+        return None
     try:
-        if os.environ.get("GEMINI_API_KEY", "").strip():
-            result = _ask_gemini(url_a, url_b, title_a, title_b)
-        elif os.environ.get("ANTHROPIC_API_KEY", "").strip():
-            result = _ask_claude(url_a, url_b, title_a, title_b)
+        if has_gemini:
+            try:
+                result = _ask_gemini(url_a, url_b, title_a, title_b)
+            except Exception as e:
+                # Gemini(無料)が回数制限などで使えない時、Anthropic(有料)のカギが
+                # あればそちらで続ける（1判定 約0.5〜1円）。無ければ諦める
+                if not has_claude:
+                    raise
+                print(f"  Gemini失敗のためClaudeに切り替え: {type(e).__name__}: {str(e)[:80]}")
+                result = _ask_claude(url_a, url_b, title_a, title_b)
         else:
-            LAST_ERROR = "カギ未設定"
-            return None
+            result = _ask_claude(url_a, url_b, title_a, title_b)
         LAST_ERROR = None
         _log(result, url_a, url_b, title_a, title_b)
         return result
