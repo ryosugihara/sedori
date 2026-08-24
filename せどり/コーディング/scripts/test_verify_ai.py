@@ -7,15 +7,17 @@
   実データで測り、souba.json の合格ライン（AI確認_同じと判定する点数 等）を
   勘ではなく数字で決められるようにする。
 
-方法:
-  メルカリの検索結果には1つの商品につき写真が複数枚ついてくる。
+方法（calibrate.py と同じペアの作り方）:
+  メルカリの1つの商品には写真が複数枚ある（同じ商品を別角度で撮ったもの）。
+  検索結果には写真が1枚しか入らないため、商品詳細から写真一覧を取る。
   - 同じ商品ペア = 1つの商品の写真1枚目 vs 2枚目（正解: 同じ）
-  - 違う商品ペア = 同じ検索結果の中の別々の商品の1枚目どうし（正解: 違う）
+  - 違う商品ペア = 別々の商品の写真1枚目どうし（正解: 違う）
     ※同じブランド・同じ種類の商品どうしなので、一番間違えやすい組み合わせ
   それぞれAIに点数を付けさせ、分布と「この点数で線を引いた時の正答率」を出す。
 
 メルカリへの負荷:
-  検索APIは KEYWORDS の数（既定3回）だけ。商品詳細ページは呼ばない。
+  検索APIは KEYWORDS の数（既定3回）。商品詳細は1件1秒間隔で、
+  1キーワードあたり最大 PAIRS_PER_KW×3 回まで（写真1枚の商品はスキップするため余裕を持つ）。
   写真は配信サーバー(CDN)から取る。AIの呼び出しは5秒間隔・合計 MAX_AI_CALLS 回まで。
 
 結果は recon/AI_VERIFY_CALIB.txt に保存し、Discordに要約を送る。
@@ -84,16 +86,31 @@ def main():
             continue
         time.sleep(REQUEST_WAIT)
         random.shuffle(items)
-        multi = [it for it in items if len(it.get("thumbnails") or []) >= 2][:PAIRS_PER_KW]
-        print(f"「{kw}」({cat}) 検索結果 {len(items)}件 / 写真2枚以上 {len(multi)}件を使用")
+
+        # 検索結果の写真は1枚だけなので、商品詳細から写真一覧を取る（calibrate.pyと同じ）。
+        # 写真が2枚以上ある商品を PAIRS_PER_KW 個集める。詳細の取得は1秒間隔・
+        # 最大 PAIRS_PER_KW×3 回まで（メルカリに優しく）。
+        multi = []   # (item, photos)
+        detail_calls = 0
+        for it in items:
+            if len(multi) >= PAIRS_PER_KW or detail_calls >= PAIRS_PER_KW * 3:
+                break
+            detail = mercari.fetch_item(it["id"])
+            detail_calls += 1
+            time.sleep(1.0)
+            photos = (detail or {}).get("photos") or []
+            if len(photos) >= 2:
+                multi.append((it, photos))
+        print(f"「{kw}」({cat}) 検索結果 {len(items)}件 / 詳細取得 {detail_calls}回 / "
+              f"写真2枚以上 {len(multi)}件を使用")
 
         # 同じ商品ペア（写真1枚目 vs 2枚目）
-        for it in multi:
+        for it, photos in multi:
             if calls >= MAX_AI_CALLS:
                 break
             url = f"https://jp.mercari.com/item/{it['id']}"
             r = verify_ai.same_product_detail(
-                it["thumbnails"][0], it["thumbnails"][1], it["name"], it["name"])
+                photos[0], photos[1], it["name"], it["name"])
             calls += 1
             if r and r.get("score") is not None:
                 pos.append((r["score"], r["verdict"], cat, it["name"], url, it["name"], url,
@@ -108,10 +125,10 @@ def main():
         for i, j in combos[:len(multi)]:
             if calls >= MAX_AI_CALLS:
                 break
-            a, b = multi[i], multi[j]
+            (a, pa), (b, pb) = multi[i], multi[j]
             ua, ub = (f"https://jp.mercari.com/item/{a['id']}", f"https://jp.mercari.com/item/{b['id']}")
             r = verify_ai.same_product_detail(
-                a["thumbnails"][0], b["thumbnails"][0], a["name"], b["name"])
+                pa[0], pb[0], a["name"], b["name"])
             calls += 1
             if r and r.get("score") is not None:
                 neg.append((r["score"], r["verdict"], cat, a["name"], ua, b["name"], ub,

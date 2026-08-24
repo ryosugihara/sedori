@@ -56,7 +56,7 @@ GitHubリポジトリ: https://github.com/ryosugihara/sedori （作業ブラン�
 - 調整系: `calibrate` / `calibrate-v2`（画像判定の合格ライン・新旧AIの精度測定）/ `test-color`（色比較の精度）/ `test-vecsize`（指紋サイズ診断）/ `clip-test`
 - お試し系: `demo-notify`（今ある商品を新着と仮定して1回通知）/ `demo-match`（画像判定のテスト通知）/ `souba-check`（「ブランド 商品 色 サイズ」の売り切れ相場を返す）/ `discover-brands`（よく売る出品者から新ブランド候補を探す。監視リストへは自動追加しない）/ `mercari-test`
 - 復旧系: `repair-db`（壊れた指紋を除去して相場DBを圧縮し直す）/ `souba-db-maintenance`（相場DBの掃除だけ。設定を変えた後、次の収集日を待たずに反映したい時。メルカリへのアクセスなし）
-- 校正系: `test-verify-ai`（最終確認AIの点数の精度測定。『AI確認_同じと判定する点数』を決めるための表を作る。検索API3回・AI最大60回）
+- 校正系: `test-verify-ai`（最終確認AIの点数の精度測定。『AI確認_同じと判定する点数』を決めるための表を作る。検索API3回＋商品詳細を少量・AI最大60回）
 
 ## 画像判定のしくみ（3段階）
 | 段階 | 部品 | 何をするか | 無い時 |
