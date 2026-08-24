@@ -55,6 +55,8 @@ _gemini_model = None  # 動いたモデル名を覚えておく
 CLAUDE_URL = "https://api.anthropic.com/v1/messages"
 CLAUDE_MODEL = "claude-haiku-4-5-20251001"
 CLAUDE_MAX_TOKENS = 800  # JSONで理由まで書かせるため、1語方式(10)より長くする
+HTTP_TIMEOUT = 45        # 1回の応答待ちの上限(秒)。混雑時に延々待たないため
+PER_CALL_BUDGET = 120    # 1判定に使ってよい合計時間(秒)。モデル乗り換えの暴走防止
 
 UA = {
     "User-Agent": (
@@ -215,14 +217,17 @@ def _ask_gemini(url_a, url_b, title_a, title_b):
         models = list(GEMINI_MODELS)
     last_err = None
     retried_wait = False  # 「何秒待て」の指示に従った再試行は1回だけ（待ちすぎ防止）
+    deadline = time.time() + PER_CALL_BUDGET  # この判定に使ってよい時間の締切
     for model in models:
+        if time.time() > deadline:
+            break  # 時間切れ。残りのモデルは試さない
         req = urllib.request.Request(
             f"{GEMINI_BASE}/{model}:generateContent?key={key}",
             data=body, method="POST",
             headers={"Content-Type": "application/json"})
         for attempt in (1, 2):
             try:
-                with urllib.request.urlopen(req, timeout=90) as res:
+                with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as res:
                     data = json.loads(res.read().decode("utf-8"))
                 if _gemini_model != model:
                     _gemini_model = model
@@ -279,7 +284,7 @@ def _ask_claude(url_a, url_b, title_a, title_b):
         headers={"Content-Type": "application/json",
                  "x-api-key": os.environ["ANTHROPIC_API_KEY"].strip(),
                  "anthropic-version": "2023-06-01"})
-    with urllib.request.urlopen(req, timeout=90) as res:
+    with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as res:
         data = json.loads(res.read().decode("utf-8"))
     return _parse("".join(b.get("text", "") for b in data.get("content", [])))
 
@@ -311,6 +316,39 @@ def _log(result, url_a, url_b, title_a, title_b):
 
 # 直前の呼び出しが失敗した理由（テスト・診断で「なぜ失敗したか」を数えるために使う）
 LAST_ERROR = None
+
+
+def ping():
+    """AIが今使える状態かを、画像なしの軽い質問1回で確かめる。
+    使えればTrue。テストが本番の測定（メルカリ取得）を始める前の生存確認用。
+    """
+    global LAST_ERROR, _gemini_model
+    key = os.environ.get("GEMINI_API_KEY", "").strip()
+    if not key:
+        if os.environ.get("ANTHROPIC_API_KEY", "").strip():
+            return True  # Claudeは従量課金でほぼ常に使える前提
+        LAST_ERROR = "カギ未設定"
+        return False
+    body = json.dumps({"contents": [{"parts": [{"text": "OK とだけ答えてください"}]}]}).encode("utf-8")
+    for model in ([_gemini_model] if _gemini_model else []) + [m for m in GEMINI_MODELS if m != _gemini_model]:
+        req = urllib.request.Request(
+            f"{GEMINI_BASE}/{model}:generateContent?key={key}",
+            data=body, method="POST", headers={"Content-Type": "application/json"})
+        try:
+            with urllib.request.urlopen(req, timeout=20) as res:
+                res.read()
+            _gemini_model = model
+            LAST_ERROR = None
+            return True
+        except urllib.error.HTTPError as e:
+            LAST_ERROR = f"HTTPError: HTTP Error {e.code}"
+            continue
+        except Exception as e:
+            LAST_ERROR = f"{type(e).__name__}: {str(e)[:80]}"
+            continue
+    if os.environ.get("ANTHROPIC_API_KEY", "").strip():
+        return True  # Geminiが全滅でもClaudeに切り替えて判定できる
+    return False
 
 
 def same_product_detail(url_a, url_b, title_a="", title_b=""):

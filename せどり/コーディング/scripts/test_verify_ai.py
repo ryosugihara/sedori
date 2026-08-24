@@ -79,6 +79,15 @@ def main():
         send_discord(msg)
         return
 
+    # 最初にAIの生存確認（画像なしの軽い1回）。AIが使えない時にメルカリの
+    # 検索・詳細取得だけを無駄に行わないための門番。
+    if not verify_ai.ping():
+        msg = (f"⏸️ AI点数の精度測定 中止: AIが現在使えません（{verify_ai.LAST_ERROR}）。"
+               "メルカリには一切アクセスしていません。時間をおいて再実行してください")
+        print(msg)
+        send_discord(msg)
+        return
+
     random.seed(7)  # 毎回同じ選び方になるように（結果を再現できる）
     pos, neg = [], []   # (点数, 判定, カテゴリ, 商品名A, URL A, 商品名B, URL B, 結論)
     calls = 0
