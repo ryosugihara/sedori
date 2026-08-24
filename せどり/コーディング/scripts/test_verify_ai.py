@@ -21,6 +21,7 @@
   写真は配信サーバー(CDN)から取る。AIの呼び出しは5秒間隔・合計 MAX_AI_CALLS 回まで。
 
 結果は recon/AI_VERIFY_CALIB.txt に保存し、Discordに要約を送る。
+※429(回数制限)で失敗した分は理由がレポートに残る。8回連続失敗で自動中断する。
 """
 
 import os
