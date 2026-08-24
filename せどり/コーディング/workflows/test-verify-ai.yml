@@ -13,9 +13,17 @@ on:
   workflow_dispatch:
     inputs:
       pairs_per_keyword:
-        description: "1キーワードあたりの同商品ペア数（既定8。増やすとAI呼び出しも増える）"
+        description: "1キーワードあたりの同商品ペア数（既定15。増やすとAI呼び出しも増える）"
         required: false
-        default: "8"
+        default: "15"
+  push:
+    branches:
+      - claude/adoring-bell-7rqznj
+    paths:
+      # このワークフロー自身か測定スクリプトが更新されたら自動で1回動く
+      # （スマホだと Run workflow ボタンが表示されないため。test-gemini と同じ方式）
+      - ".github/workflows/test-verify-ai.yml"
+      - "せどり/コーディング/scripts/test_verify_ai.py"
 
 permissions:
   contents: write
@@ -45,7 +53,7 @@ jobs:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          TEST_PAIRS: ${{ github.event.inputs.pairs_per_keyword || '8' }}
+          TEST_PAIRS: ${{ github.event.inputs.pairs_per_keyword || '15' }}
           MAX_AI_CALLS: "60"
         run: python せどり/コーディング/scripts/test_verify_ai.py
 
