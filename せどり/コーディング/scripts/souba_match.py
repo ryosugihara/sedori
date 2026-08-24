@@ -302,6 +302,9 @@ def match_item(item, souba, stats=None, min_profit=None):
             return None
         estimate = pm["estimate"]
         _count(f"confidence_{pm['confidence']}")  # 相場の信頼度(高/中/低)の内訳
+        if pm["confidence"] == "低":
+            # どのブランドの売却実例が足りないかを診断レポートに出すため、ブランド別にも数える
+            _count(f"低信頼ブランド_{item.get('brand', '不明')}")
 
         fee, ship = souba["fee"], souba["shipping"]
         net = int(estimate * (1 - fee) - ship)  # メルカリ手取り

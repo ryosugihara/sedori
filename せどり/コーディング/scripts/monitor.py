@@ -616,6 +616,16 @@ def write_scan_diagnostics(path, total_fetched, examined, stats, sent_count):
             f"8. 相場の信頼度（根拠の実例件数）: 高 {conf_h} 件 / 中 {conf_m} 件 / "
             f"低 {conf_l} 件（低＝最安値で控えめに判定）"
         )
+    # どのブランドの売却実例が足りないか（相場DBのキーワードを足す目安になる）
+    low_brands = sorted(
+        [(k.replace("低信頼ブランド_", ""), v) for k, v in stats.items()
+         if k.startswith("低信頼ブランド_")],
+        key=lambda x: -x[1],
+    )[:10]
+    if low_brands:
+        lines.append("9. 根拠不足（信頼度低）が多いブランド（watch_mercari.json のキーワード追加の目安）:")
+        for name, n in low_brands:
+            lines.append(f"   ・{name}: {n} 件")
 
     report = "\n".join(lines)
     os.makedirs("せどり/データ/recon", exist_ok=True)
