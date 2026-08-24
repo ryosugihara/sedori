@@ -249,11 +249,16 @@ def _ask_gemini(url_a, url_b, title_a, title_b):
                         time.sleep(wait_s)
                         retried_wait = True
                         continue
-                if e.code in (404, 429):
-                    break  # このモデルは使えない→次の候補へ
+                if e.code in (404, 429, 500, 503):
+                    # 404=モデル無し / 429=回数制限 / 500・503=サーバー側の混雑・不調。
+                    # どれもこのモデル固有のことが多いので、次の候補モデルを試す
+                    break
                 raise
-        else:
-            continue
+            except (TimeoutError, urllib.error.URLError, OSError) as e:
+                # 応答待ち切れ・接続の不調。混雑が原因のことが多いので次のモデルを試す
+                print(f"  Gemini {model}: 接続失敗 {type(e).__name__}: {str(e)[:80]}")
+                last_err = e
+                break
     raise last_err
 
 

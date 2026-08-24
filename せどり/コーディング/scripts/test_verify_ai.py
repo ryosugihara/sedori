@@ -22,12 +22,15 @@
 
 結果は recon/AI_VERIFY_CALIB.txt に保存し、Discordに要約を送る。
 ※429(回数制限)で失敗した分は理由がレポートに残る。8回連続失敗で自動中断する。
+※測定は「同じ」「違う」を交互に行い、生データは AI_VERIFY_CALIB_RAW.json に累積する。
+  途中で中断しても実行のたびにデータが貯まり、レポートは累積全体から作られる。
 """
 
 import os
 import json
 import time
 import random
+import datetime
 import urllib.request
 
 import mercari
@@ -43,6 +46,7 @@ PAIRS_PER_KW = int(os.environ.get("TEST_PAIRS", "8"))   # 1キーワードあた
 MAX_AI_CALLS = int(os.environ.get("MAX_AI_CALLS", "60"))  # AI呼び出しの上限（無料枠を守る）
 REQUEST_WAIT = 1.5
 REPORT = "せどり/データ/recon/AI_VERIFY_CALIB.txt"
+RAW = "せどり/データ/recon/AI_VERIFY_CALIB_RAW.json"  # 測定の生データ（実行をまたいで累積）
 
 
 def send_discord(message):
@@ -126,38 +130,62 @@ def main():
         print(f"「{kw}」({cat}) 検索結果 {len(items)}件 / 詳細取得 {detail_calls}回 / "
               f"写真2枚以上 {len(multi)}件を使用")
 
-        # 同じ商品ペア（写真1枚目 vs 2枚目）
-        for it, photos in multi:
-            if calls >= MAX_AI_CALLS or aborted[0]:
-                break
-            url = f"https://jp.mercari.com/item/{it['id']}"
-            r = verify_ai.same_product_detail(
-                photos[0], photos[1], it["name"], it["name"])
-            calls += 1
-            if record(r):
-                pos.append((r["score"], r["verdict"], cat, it["name"], url, it["name"], url,
-                            r.get("reason", "")))
-                print(f"  同商品 {r['score']:3d}点 {r['verdict']:9s} {it['name'][:30]}")
-            else:
-                print(f"  同商品 失敗/点数なし {it['name'][:30]}")
-
-        # 違う商品ペア（別々の商品の1枚目どうし。同数になるよう組み合わせを選ぶ）
+        # 「同じ商品ペア」と「違う商品ペア」を交互に測る。
+        # 以前は同じペアを全部測ってから違うペアだったため、途中で中断すると
+        # 「違う商品が0組」になり合格ラインを決められなかった。
         combos = [(i, j) for i in range(len(multi)) for j in range(i + 1, len(multi))]
         random.shuffle(combos)
-        for i, j in combos[:len(multi)]:
+        tasks = []
+        for k in range(len(multi)):
+            it, photos = multi[k]
+            url = f"https://jp.mercari.com/item/{it['id']}"
+            tasks.append(("same", photos[0], photos[1], it["name"], url, it["name"], url))
+            if k < len(combos):
+                (a, pa), (b, pb) = multi[combos[k][0]], multi[combos[k][1]]
+                tasks.append(("diff", pa[0], pb[0],
+                              a["name"], f"https://jp.mercari.com/item/{a['id']}",
+                              b["name"], f"https://jp.mercari.com/item/{b['id']}"))
+
+        for kind, img_a, img_b, na, ua, nb, ub in tasks:
             if calls >= MAX_AI_CALLS or aborted[0]:
                 break
-            (a, pa), (b, pb) = multi[i], multi[j]
-            ua, ub = (f"https://jp.mercari.com/item/{a['id']}", f"https://jp.mercari.com/item/{b['id']}")
-            r = verify_ai.same_product_detail(
-                pa[0], pb[0], a["name"], b["name"])
+            r = verify_ai.same_product_detail(img_a, img_b, na, nb)
             calls += 1
+            label = "同商品" if kind == "same" else "別商品"
             if record(r):
-                neg.append((r["score"], r["verdict"], cat, a["name"], ua, b["name"], ub,
-                            r.get("reason", "")))
-                print(f"  別商品 {r['score']:3d}点 {r['verdict']:9s} {a['name'][:20]} / {b['name'][:20]}")
+                row = (r["score"], r["verdict"], cat, na, ua, nb, ub, r.get("reason", ""))
+                (pos if kind == "same" else neg).append(row)
+                print(f"  {label} {r['score']:3d}点 {r['verdict']:9s} {na[:30]}")
             else:
-                print(f"  別商品 失敗/点数なし")
+                print(f"  {label} 失敗/点数なし {na[:30]}")
+
+    # 今回の測定分を生データ(RAW)に追記し、レポートは累積全体から作る
+    # （1回の実行が途中で失敗しても、繰り返すうちにデータが貯まる）
+    ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+    history = []
+    try:
+        with open(RAW, "r", encoding="utf-8") as f:
+            history = json.load(f)
+    except Exception:
+        history = []
+    for kind, rows in (("same", pos), ("diff", neg)):
+        for score, verdict, cat, na, ua, nb, ub, reason in rows:
+            history.append({"ts": ts, "kind": kind, "score": score, "verdict": verdict,
+                            "cat": cat, "name_a": na, "url_a": ua,
+                            "name_b": nb, "url_b": ub, "reason": reason})
+    history = history[-2000:]  # 太りすぎ防止
+    new_same, new_diff = len(pos), len(neg)
+    if history:
+        os.makedirs(os.path.dirname(RAW), exist_ok=True)
+        with open(RAW, "w", encoding="utf-8") as f:
+            json.dump(history, f, ensure_ascii=False, indent=1)
+    # 累積全体を pos/neg に読み直す
+    pos = [(h["score"], h["verdict"], h["cat"], h["name_a"], h["url_a"],
+            h["name_b"], h["url_b"], h.get("reason", ""))
+           for h in history if h["kind"] == "same"]
+    neg = [(h["score"], h["verdict"], h["cat"], h["name_a"], h["url_a"],
+            h["name_b"], h["url_b"], h.get("reason", ""))
+           for h in history if h["kind"] == "diff"]
 
     if not pos and not neg:
         msg = "⚠️ AI点数の精度測定: ペアを1組も測れませんでした（AI接続かメルカリ取得の失敗）"
@@ -169,7 +197,8 @@ def main():
     ns = sorted(s for s, *_ in neg)
     same_th, diff_th = verify_ai._thresholds()
 
-    lines = [f"最終確認AIの点数 精度測定  同じ商品ペア {len(pos)}組 / 違う商品ペア {len(neg)}組"
+    lines = [f"最終確認AIの点数 精度測定（累計）  同じ商品ペア {len(pos)}組 / 違う商品ペア {len(neg)}組",
+             f"  今回の実行: 同じ {new_same}組 / 違う {new_diff}組"
              f"（AI呼び出し {calls}回・うち失敗 {sum(fails.values())}回）", ""]
     if fails:
         lines.append("【測定できなかった呼び出しの内訳】")
