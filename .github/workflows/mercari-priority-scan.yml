@@ -73,7 +73,10 @@ jobs:
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@users.noreply.github.com"
+          # AIの判定理由ログ(AI_VERIFY_LOG.txt)も保存する。これが無いと
+          # 「なぜ通知に至らなかったか」の分析ができないため（存在しない時は無視）
           git add せどり/データ/state/mercari_scan_seen.json
+          git add せどり/データ/recon/AI_VERIFY_LOG.txt || true
           git commit -m "メルカリ優先スキャン: 送信済み記録を更新 [skip ci]" || echo "変更なし"
           git pull --rebase origin ${{ github.ref_name }} || true
           git push || echo "push スキップ"
