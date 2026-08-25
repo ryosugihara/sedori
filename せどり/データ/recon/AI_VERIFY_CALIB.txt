@@ -1,33 +1,38 @@
-最終確認AIの点数 精度測定  同じ商品ペア 5組 / 違う商品ペア 0組（AI呼び出し 22回・うち失敗 17回）
+最終確認AIの点数 精度測定（累計）  同じ商品ペア 11組 / 違う商品ペア 10組
+  今回の実行: 同じ 11組 / 違う 10組（AI呼び出し 42回・うち失敗 21回）
 
 【測定できなかった呼び出しの内訳】
-  11回: HTTPError: HTTP Error 503: Service Unavailable
-  6回: TimeoutError: The read operation timed out
+  21回: HTTPError: HTTP Error 404: Not Found
   ※失敗が8回連続したため途中で中断した
 
 【点数の分布】
   同じ商品:  最低 95 / 25% 100 / 中央 100 / 75% 100 / 最高 100
-  違う商品:  最低 None / 25% None / 中央 None / 75% None / 最高 None
+  違う商品:  最低 0 / 25% 0 / 中央 0 / 75% 0 / 最高 85
 
 【『同じ』と判定する点数を変えた時】
   合格ライン   同じ商品を拾える率   違う商品を誤って拾う率
-   50点以上       100.0%                0.00%
-   60点以上       100.0%                0.00%
-   70点以上       100.0%                0.00%
-   80点以上       100.0%                0.00% ← 今の設定
+   50点以上       100.0%               10.00%
+   60点以上       100.0%               10.00%
+   70点以上       100.0%               10.00%
+   80点以上       100.0%               10.00% ← 今の設定
    90点以上       100.0%                0.00%
    95点以上       100.0%                0.00%
 
-  → 違う商品の誤合格が0件になる一番低いライン: 50点（今の設定 80点）
+  → 違う商品の誤合格が0件になる一番低いライン: 90点（今の設定 80点）
 
 【カテゴリ別の中央値】
-  服: 同じ商品 中央 100（5組） / 違う商品 中央 None（0組）
+  服: 同じ商品 中央 100（11組） / 違う商品 中央 0（10組）
 
 【要確認の組（人の目で見直す用）】
   同じ商品なのに点数が低かった:
-     95点 00s SCHLÜSSEL straight slim de https://jp.mercari.com/item/m97095313740  結論: 商品Aと商品Bは、同一の型で、同一のカラー展開の商品であると断定できます。
-    100点 dpjiwlgd様専用SAINT LAURENT デニム 日 https://jp.mercari.com/item/m25169458162  結論: 写真Aと写真Bは、型、カラー、ディテールが完全に一致しており、同一の商品です。
-    100点 SAINT LAURENT サンローラン デニム 25 https://jp.mercari.com/item/m15774222011  結論: 
-    100点 美品 イヴサンローラン 長袖 ポロシャツ ボーダー YSL刺 https://jp.mercari.com/item/m53680298662  結論: 写真Aと写真Bは、同一の型で、同一のカラー展開の同一商品を異なるアングルから撮影したものであると断定できます。
-    100点 SAINT LAURENT PARIS フラミンゴ ロゴ T https://jp.mercari.com/item/m49285638505  結論: 
+     95点 00s SCHLÜSSEL straight slim de https://jp.mercari.com/item/m97095313740  結論: 商品Aと商品Bは、同一の型で、同一のカラー展開の商品であると強く推測されます。
+     98点 SAINT LAURENT JEANS デニムパンツ W32 https://jp.mercari.com/item/m87065461279  結論: 両商品は同一の型で、同一のカラー展開の商品であると断定できます。
+    100点 y2k archive grunge cortis ナンバー https://jp.mercari.com/item/m40105435567  結論: 写真Aと写真Bは、型、色、細部がすべて一致しており、同一の商品です。
+    100点 SAINT LAURENT PARIS D02 M/SK-L https://jp.mercari.com/item/m46522737905  結論: 写真Aと写真Bは、型、カラー、細部のディテールがすべて一致しており、同一商品であると断定できます。
+    100点 【エディ期】SAINT LAURENT PARISスキニーデ https://jp.mercari.com/item/m88417449856  結論: 商品Aと商品Bは、型、カラー、細部がすべて一致しており、同一商品と断定できます。
   違う商品なのに点数が高かった:
+     85点 カエル様専用Yves Saint Laurent  https://jp.mercari.com/item/m67199066896 / 90sUSA製 Yves Saint Lauren https://jp.mercari.com/item/m24931243963  結論: 商品Aのレザーパッチの特徴および商品名から、商品Bと同一型・同一カラーのヴィンテージYSLデニムパンツであると判断できま
+     40点 SAINT LAURENT PARIS D02 M https://jp.mercari.com/item/m46522737905 / 00s diesel coating skinny https://jp.mercari.com/item/m28337807955  結論: ブランド、アイテムの種類は一致するが、色と質感が大きく異なるため、同一の型で同一のカラー展開の商品ではないと判断する。
+      0点 8/23まで　アルマーニ、YSL、ヴェルサーチ　メ https://jp.mercari.com/item/m40066614381 / 00s diesel coating skinny https://jp.mercari.com/item/m28337807955  結論: 商品Aと商品Bはアイテムの種類、ブランド、デザイン、カラーが全て異なるため、同一の商品ではない。
+      0点 【エディ期】SAINT LAURENT PARIS https://jp.mercari.com/item/m88417449856 / 【美品】サンローラン　Saint Laurent  https://jp.mercari.com/item/m19962711493  結論: 商品Aと商品Bは、アイテムの種類、カラー、デザインディテールが全て異なるため、同一の商品ではありません。
+      0点 【エディ期】SAINT LAURENT PARIS https://jp.mercari.com/item/m88417449856 / archive FUGA coating skin https://jp.mercari.com/item/m62334743193  結論: 商品名に記載されているブランドが異なるため、同一の型で同一のカラー展開の商品であるとは断定できません。
