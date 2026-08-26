@@ -192,11 +192,24 @@ def _wait_turn():
     _last_call[0] = time.time()
 
 
+def _fetch_pair(url_a, url_b):
+    """2枚の写真を取得する。失敗した時は『どちらの写真が取れなかったか』が
+    分かるエラーにする（404がAI側なのか写真側なのか区別できるように）"""
+    try:
+        b64a, ma = _fetch_b64(url_a)
+    except Exception as e:
+        raise RuntimeError(f"画像取得失敗(1枚目): {type(e).__name__} {str(e)[:60]}")
+    try:
+        b64b, mb = _fetch_b64(url_b)
+    except Exception as e:
+        raise RuntimeError(f"画像取得失敗(2枚目): {type(e).__name__} {str(e)[:60]}")
+    return b64a, ma, b64b, mb
+
+
 def _ask_gemini(url_a, url_b, title_a, title_b):
     global _gemini_model
     _wait_turn()
-    b64a, ma = _fetch_b64(url_a)
-    b64b, mb = _fetch_b64(url_b)
+    b64a, ma, b64b, mb = _fetch_pair(url_a, url_b)
     payload = {
         "contents": [{"parts": [
             {"inline_data": {"mime_type": ma, "data": b64a}},
@@ -270,14 +283,15 @@ def _ask_gemini(url_a, url_b, title_a, title_b):
 def _ask_claude(url_a, url_b, title_a, title_b):
     _wait_turn()
 
-    def block(url):
-        b64, media = _fetch_b64(url)
+    b64a, ma, b64b, mb = _fetch_pair(url_a, url_b)
+
+    def block(b64, media):
         return {"type": "image",
                 "source": {"type": "base64", "media_type": media, "data": b64}}
     payload = {"model": CLAUDE_MODEL, "max_tokens": CLAUDE_MAX_TOKENS,
                "temperature": 0.1,
                "messages": [{"role": "user", "content": [
-                   block(url_a), block(url_b),
+                   block(b64a, ma), block(b64b, mb),
                    {"type": "text", "text": _prompt(title_a, title_b)}]}]}
     req = urllib.request.Request(
         CLAUDE_URL, data=json.dumps(payload).encode("utf-8"), method="POST",
