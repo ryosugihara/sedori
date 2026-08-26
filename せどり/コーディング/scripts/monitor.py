@@ -626,6 +626,16 @@ def write_scan_diagnostics(path, total_fetched, examined, stats, sent_count):
         lines.append("9. 根拠不足（信頼度低）が多いブランド（watch_mercari.json のキーワード追加の目安）:")
         for name, n in low_brands:
             lines.append(f"   ・{name}: {n} 件")
+    # 「似た実例は見つかったのに、答え合わせ（幾何検証・色比較・AI確認）で
+    # 裏付けが取れず落ちた」件数。利益ライン以上なのに送信されない主因を追う用
+    unverified = stats.get("reason_類似度不足_未確認", 0)
+    pattern_rej = stats.get("reason_類似度不足_柄物別物判定", 0)
+    if unverified or pattern_rej:
+        lines.append(
+            f"10. 答え合わせで裏付けが取れず落ちた件数: {unverified} 件"
+            f"（ほかに柄物でAIが別物と判定: {pattern_rej} 件）"
+            "→ 内訳は recon/AI_VERIFY_LOG.txt の判定理由を参照"
+        )
     # 最終確認（色比較・幾何検証・AI）で何が起きたかの内訳。
     # 「利益ライン以上なのに送信0件」の原因が、色違いで捨てたのか・AIが失敗して
     # いたのか（回数制限など）・AIが別物と判定したのかを切り分けるための項目
