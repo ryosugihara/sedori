@@ -374,12 +374,14 @@ def match_item(item, souba, stats=None, min_profit=None):
             #   なかったため、分布で見るcolor_hist_distanceに置き換えた。
             color_dist = geom_verify.color_hist_distance(raw_item, raw_ref)
             if color_dist is not None and color_dist > color_hist_th:
+                _count("final_色違いで候補を除外")
                 continue
 
             inl = geom_verify.inlier_count(raw_item, raw_ref)
             # GG柄等の繰り返し柄は、幾何検証も似た特徴点だらけで誤って合格しやすい
             # （geom_verify.py自身の注意書き通り）ため、幾何検証の結果は信用しない。
             if inl >= geo_th and not capped_c:
+                _count("final_幾何検証で合格")
                 verified = f"幾何検証OK({inl}点一致)"
                 verified_i, verified_rank = ci, cand_rank
                 break
@@ -391,9 +393,21 @@ def match_item(item, souba, stats=None, min_profit=None):
             # AIは「一致度(0〜100点)＋理由」で答える（verify_ai.py）。
             # 点数の合格ラインは souba.json の『AI確認_同じと判定する点数』。
             # 理由は recon/AI_VERIFY_LOG.txt に残るので、落ちた原因を後で見返せる。
-            ai = verify_ai.same_product_detail(
-                item["image"], rs[ci][5],
-                item.get("title", ""), rs[ci][1] or "") if verify_ai.available() else None
+            # AIを呼べなかった・呼んだが失敗した回数も数えて診断レポートに出す
+            # （「利益ライン以上なのに通知0件」の原因を、色/幾何/AIのどこで
+            #   落ちたのか切り分けるため。失敗した呼び出しはAIログに残らない）。
+            if verify_ai.available():
+                ai = verify_ai.same_product_detail(
+                    item["image"], rs[ci][5],
+                    item.get("title", ""), rs[ci][1] or "")
+                if ai is None:
+                    _count("final_AI失敗_" + (verify_ai.LAST_ERROR or "不明")[:40])
+                else:
+                    _count("final_AI判定_" + {"same": "同じ", "different": "違う"}
+                           .get(ai["verdict"], "不明"))
+            else:
+                _count("final_AIのカギ未設定")
+                ai = None
             v = ai["verdict"] if ai else None
             if v == "same":
                 score = ai.get("score")

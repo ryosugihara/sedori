@@ -626,6 +626,18 @@ def write_scan_diagnostics(path, total_fetched, examined, stats, sent_count):
         lines.append("9. 根拠不足（信頼度低）が多いブランド（watch_mercari.json のキーワード追加の目安）:")
         for name, n in low_brands:
             lines.append(f"   ・{name}: {n} 件")
+    # 最終確認（色比較・幾何検証・AI）で何が起きたかの内訳。
+    # 「利益ライン以上なのに送信0件」の原因が、色違いで捨てたのか・AIが失敗して
+    # いたのか（回数制限など）・AIが別物と判定したのかを切り分けるための項目
+    finals = sorted(
+        [(k.replace("final_", ""), v) for k, v in stats.items()
+         if k.startswith("final_")],
+        key=lambda x: -x[1],
+    )
+    if finals:
+        lines.append("10. 最終確認（色比較・幾何検証・AI）の内訳（候補ごとの回数）:")
+        for name, n in finals:
+            lines.append(f"   ・{name}: {n} 回")
 
     report = "\n".join(lines)
     os.makedirs("せどり/データ/recon", exist_ok=True)
