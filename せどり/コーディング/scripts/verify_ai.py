@@ -44,11 +44,14 @@ LOG_MAX_LINES = 1500   # これを超えたら古い行から消す（ファイ�
 
 # Geminiのモデル名は世代交代が早く、古い名前は無料枠の対象外になることがある。
 # 上から順に試して、動いた物を覚えて使い続ける。
+# ※gemini-2.0-flash は2026年6月に廃止された（404が返る）ため外した。
+#   廃止モデルが最後にあると、本当の原因（429=回数制限）が404で上書きされて
+#   診断を誤らせる。「-latest」は常に最新版を指す別名なので廃止に強い。
 GEMINI_MODELS = [
-    "gemini-2.5-flash-lite",
-    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",   # 無料枠が一番多い（約1,000回/日）
+    "gemini-2.5-flash",        # 精度高め（約250回/日）
+    "gemini-flash-lite-latest",
     "gemini-flash-latest",
-    "gemini-2.0-flash",
 ]
 GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 _gemini_model = None  # 動いたモデル名を覚えておく

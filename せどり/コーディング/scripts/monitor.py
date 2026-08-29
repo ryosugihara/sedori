@@ -645,7 +645,7 @@ def write_scan_diagnostics(path, total_fetched, examined, stats, sent_count):
         key=lambda x: -x[1],
     )
     if finals:
-        lines.append("10. 最終確認（色比較・幾何検証・AI）の内訳（候補ごとの回数）:")
+        lines.append("11. 最終確認（色比較・幾何検証・AI）の内訳（候補ごとの回数）:")
         for name, n in finals:
             lines.append(f"   ・{name}: {n} 回")
 
