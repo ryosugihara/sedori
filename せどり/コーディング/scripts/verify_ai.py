@@ -17,6 +17,13 @@ AIによる「同じ商品か」の最終確認 部品（任意機能）
   1. GEMINI_API_KEY    … GoogleのAI。無料枠あり（カード登録不要）← おすすめ
      カギの作り方: https://aistudio.google.com/apikey で「APIキーを作成」
   2. ANTHROPIC_API_KEY … Claude。精度高いが有料（1判定 約0.5〜1円）
+     Geminiが夜間の混雑・回数制限で使えない時だけ、自動でこちらに切り替わる
+
+有料AIの使いすぎ防止:
+  1回の実行で有料AIを呼ぶ回数に上限を付けている（既定 30回 ≒ 30円）。
+  上限に達したらその実行では有料AIを呼ばず、AI確認なしで進む（監視は止めない）。
+  変えたい時は環境変数 AI_PAID_MAX_CALLS か、souba.json の
+  「AI確認_有料AIの上限回数_1実行あたり」で設定する。
 
 AIが読めない情報（内タグの型番・年代・生産国）は評価軸に入れていない。
 入れるとAIが想像で埋めてしまい、かえって誤判定が増えるため。
@@ -58,6 +65,12 @@ _gemini_model = None  # 動いたモデル名を覚えておく
 CLAUDE_URL = "https://api.anthropic.com/v1/messages"
 CLAUDE_MODEL = "claude-haiku-4-5-20251001"
 CLAUDE_MAX_TOKENS = 800  # JSONで理由まで書かせるため、1語方式(10)より長くする
+
+# 有料AI(Claude)を1回の実行で呼んでよい回数の上限。
+# 大きくすると取りこぼしは減るが、その分お金がかかる（1回 約0.5〜1円）。
+# 小さくすると安全だが、Geminiが長時間使えない夜はAI確認なしの商品が増える。
+PAID_MAX_CALLS_DEFAULT = 30
+_paid_calls = [0]  # この実行で有料AIを呼んだ回数
 HTTP_TIMEOUT = 45        # 1回の応答待ちの上限(秒)。混雑時に延々待たないため
 PER_CALL_BUDGET = 120    # 1判定に使ってよい合計時間(秒)。モデル乗り換えの暴走防止
 
@@ -84,6 +97,30 @@ def _thresholds():
                 int(s.get("AI確認_違うと判定する点数", DIFF_SCORE_DEFAULT)))
     except Exception:
         return SAME_SCORE_DEFAULT, DIFF_SCORE_DEFAULT
+
+
+def _paid_limit():
+    """有料AIを1回の実行で呼んでよい上限回数。
+    環境変数 AI_PAID_MAX_CALLS が最優先、次に souba.json、無ければ既定値。
+    """
+    env = os.environ.get("AI_PAID_MAX_CALLS", "").strip()
+    if env:
+        try:
+            return max(0, int(env))
+        except ValueError:
+            pass
+    try:
+        with open("せどり/データ/watchlists/souba.json", "r", encoding="utf-8") as f:
+            s = json.load(f).get("設定", {})
+        return max(0, int(s.get("AI確認_有料AIの上限回数_1実行あたり",
+                               PAID_MAX_CALLS_DEFAULT)))
+    except Exception:
+        return PAID_MAX_CALLS_DEFAULT
+
+
+def paid_calls_used():
+    """この実行で有料AIを何回呼んだか（診断レポート用）"""
+    return _paid_calls[0]
 
 
 def _fetch_b64(url):
@@ -250,7 +287,9 @@ def _ask_gemini(url_a, url_b, title_a, title_b):
                     print(f"  Gemini: モデル {model} を使用")
                 parts = (data.get("candidates") or [{}])[0].get(
                     "content", {}).get("parts", [])
-                return _parse("".join(p.get("text", "") for p in parts))
+                r = _parse("".join(p.get("text", "") for p in parts))
+                r["ai"] = "Gemini(無料)"
+                return r
             except urllib.error.HTTPError as e:
                 detail = ""
                 try:
@@ -284,9 +323,14 @@ def _ask_gemini(url_a, url_b, title_a, title_b):
 
 
 def _ask_claude(url_a, url_b, title_a, title_b):
+    limit = _paid_limit()
+    if _paid_calls[0] >= limit:
+        # お金がかかる方のAI。使いすぎ防止の上限に達したらここで止める
+        raise RuntimeError(f"有料AIの上限({limit}回/実行)に達したため呼びません")
     _wait_turn()
 
     b64a, ma, b64b, mb = _fetch_pair(url_a, url_b)
+    _paid_calls[0] += 1
 
     def block(b64, media):
         return {"type": "image",
@@ -303,7 +347,9 @@ def _ask_claude(url_a, url_b, title_a, title_b):
                  "anthropic-version": "2023-06-01"})
     with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as res:
         data = json.loads(res.read().decode("utf-8"))
-    return _parse("".join(b.get("text", "") for b in data.get("content", [])))
+    r = _parse("".join(b.get("text", "") for b in data.get("content", [])))
+    r["ai"] = "Claude(有料)"
+    return r
 
 
 def _log(result, url_a, url_b, title_a, title_b):
@@ -315,7 +361,8 @@ def _log(result, url_a, url_b, title_a, title_b):
         now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
         score = "--" if result.get("score") is None else f"{result['score']:3d}点"
         jp = {"same": "同じ", "different": "違う", "unsure": "不明"}.get(result["verdict"], "?")
-        line = (f"{now} | {score} | {jp} | A: {title_a[:30]} {url_a} | "
+        who = result.get("ai", "?")  # どちらのAIが答えたか（無料/有料の内訳を後で見るため）
+        line = (f"{now} | {score} | {jp} | {who} | A: {title_a[:30]} {url_a} | "
                 f"B: {title_b[:30]} {url_b} | 結論: {result.get('reason', '')} | "
                 f"違い: {result.get('differences', '')}\n")
         lines = []
@@ -343,7 +390,14 @@ def ping():
     key = os.environ.get("GEMINI_API_KEY", "").strip()
     if not key:
         if os.environ.get("ANTHROPIC_API_KEY", "").strip():
-            return True  # Claudeは従量課金でほぼ常に使える前提
+            # 有料AIも「登録してあるから使えるはず」で済ませず、実際に確かめる
+            # （カギの貼り間違いを、本番の判定が始まる前に見つけるため）
+            ok, why = ping_claude()
+            if ok:
+                LAST_ERROR = None
+                return True
+            LAST_ERROR = f"有料AI: {why}"
+            return False
         LAST_ERROR = "カギ未設定"
         return False
     body = json.dumps({"contents": [{"parts": [{"text": "OK とだけ答えてください"}]}]}).encode("utf-8")
@@ -364,8 +418,61 @@ def ping():
             LAST_ERROR = f"{type(e).__name__}: {str(e)[:80]}"
             continue
     if os.environ.get("ANTHROPIC_API_KEY", "").strip():
-        return True  # Geminiが全滅でもClaudeに切り替えて判定できる
+        # Geminiが全滅でも、有料AIが本当に応答するなら判定は続けられる
+        ok, why = ping_claude()
+        if ok:
+            LAST_ERROR = None
+            return True
+        LAST_ERROR = f"{LAST_ERROR} / 有料AI: {why}"
     return False
+
+
+def ping_claude():
+    """Anthropic(有料AI)のカギが本当に使えるかを、写真なしの短い質問1回で確かめる。
+    返り値: (使えるか, 説明の文字列)。カギの値そのものは絶対に返さない・記録しない。
+    ごく短い質問なので費用はほぼゼロ（0.01円未満）。
+    """
+    key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+    if not key:
+        return False, "カギ未設定"
+    payload = {"model": CLAUDE_MODEL, "max_tokens": 5,
+               "messages": [{"role": "user", "content": "OK とだけ答えてください"}]}
+    req = urllib.request.Request(
+        CLAUDE_URL, data=json.dumps(payload).encode("utf-8"), method="POST",
+        headers={"Content-Type": "application/json",
+                 "x-api-key": key, "anthropic-version": "2023-06-01"})
+    try:
+        with urllib.request.urlopen(req, timeout=20) as res:
+            res.read()
+        return True, "OK"
+    except urllib.error.HTTPError as e:
+        # 401=カギが違う / 400=形式ミス / 429=回数制限 / 529=混雑
+        hint = {401: "カギが違う（貼り間違い・余分な空白）",
+                403: "このカギでは使えない",
+                429: "回数制限",
+                529: "混雑中"}.get(e.code, "")
+        return False, f"HTTP {e.code} {hint}".strip()
+    except Exception as e:
+        return False, f"{type(e).__name__}: {str(e)[:60]}"
+
+
+def ask_claude_detail(url_a, url_b, title_a="", title_b=""):
+    """有料AI(Claude)だけを名指しで呼ぶ（動作テスト用）。
+    ふだんの判定は same_product_detail を使うこと（無料のGemini優先になる）。
+    """
+    global LAST_ERROR
+    if not os.environ.get("ANTHROPIC_API_KEY", "").strip():
+        LAST_ERROR = "カギ未設定"
+        return None
+    try:
+        result = _ask_claude(url_a, url_b, title_a, title_b)
+        LAST_ERROR = None
+        _log(result, url_a, url_b, title_a, title_b)
+        return result
+    except Exception as e:
+        LAST_ERROR = f"{type(e).__name__}: {str(e)[:120]}"
+        print(f"  有料AIの確認に失敗: {LAST_ERROR}")
+        return None
 
 
 def same_product_detail(url_a, url_b, title_a="", title_b=""):

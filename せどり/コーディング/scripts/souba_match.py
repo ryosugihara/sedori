@@ -405,6 +405,9 @@ def match_item(item, souba, stats=None, min_profit=None):
                 else:
                     _count("final_AI判定_" + {"same": "同じ", "different": "違う"}
                            .get(ai["verdict"], "不明"))
+                    # どちらのAIが答えたかも数える（有料AIを何回使ったか＝
+                    # おおよその費用が診断レポートで分かるように。1回 約0.5〜1円）
+                    _count("final_AI使用_" + ai.get("ai", "不明"))
             else:
                 _count("final_AIのカギ未設定")
                 ai = None
