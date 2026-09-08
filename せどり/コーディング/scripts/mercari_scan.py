@@ -236,6 +236,11 @@ def main():
             }
             if monitor.is_excluded(it, excludes):
                 continue
+            # 服以外（バッグ・靴・小物）は調査しない（服のせどりに集中するため。
+            # priority.json の『服以外_調査しない』を false にすれば従来通り調べる）
+            if priority.skip_item(it["title"]):
+                stats["reason_その他_服以外"] = stats.get("reason_その他_服以外", 0) + 1
+                continue
             m = souba_match.match_item(it, souba, stats=stats, min_profit=souba["notify_line"])
             checked += 1
             # 「同じと確認できた同デザイン」だけ送る。以前は未確認の「似た系統」も

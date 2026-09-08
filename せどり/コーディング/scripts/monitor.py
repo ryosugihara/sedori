@@ -729,6 +729,11 @@ def scan_profitable():
                     break
                 if is_excluded(it, excludes):
                     continue
+                # 服以外（バッグ・靴・小物）は調査しない（服のせどりに集中するため）
+                if priority is not None and priority.skip_item(
+                        f"{it.get('title', '')} {it.get('category', '')}"):
+                    stats["reason_その他_服以外"] = stats.get("reason_その他_服以外", 0) + 1
+                    continue
                 dedup = (it.get("shop"), str(it.get("id")))
                 if dedup in seen_keys:
                     continue

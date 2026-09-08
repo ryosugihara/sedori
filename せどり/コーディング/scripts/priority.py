@@ -3,15 +3,18 @@
 調査・通知の優先順位 部品（watchlists/priority.json が設定の正）
 
 このプログラムがすること:
-  1. 商品名（とカテゴリ）から優先度スコアを計算する
-       - 服以外（バッグ・靴・小物）: 減点 …… 服のせどりを中心にするため
+  1. 服以外（バッグ・靴・小物）かどうかを判定する
+       → 設定『服以外_調査しない』が true なら、その商品は調査そのものを行わない
+  2. 商品名（とカテゴリ）から優先度スコアを計算する
        - 派手・個性の強いデザイン: 加点 …… 高値で売りやすいため
        - 無地・シンプルな服: 減点 …… 画像判別が難しく利益も出にくいため
-       - 今の季節（約1ヶ月先取り）の服: 加点 / 前の季節だけの服: 減点
-  2. 商品リストやキーワードリストを「スコアが高い順」に並べ替える
+       - 今の季節（設定した日数ぶん先取り）の服: 加点 / 前の季節だけの服: 減点
+  3. 商品リストやキーワードリストを「スコアが高い順」に並べ替える
 
 使い方（スキャン側から）:
     import priority
+    if priority.skip_item(name):      # 服以外なら調査しない
+        continue
     items = priority.sort_by_score(items, key=lambda it: it.get("name", ""))
     targets = priority.sort_keywords(targets)  # (ブランド, キーワード) のリスト
 
@@ -44,14 +47,36 @@ def _conf():
 
 
 def current_season(today=None):
-    """『今の季節』と『1つ前の季節』を返す。先取り_日数(既定30日)ぶん前倒しする。
-    例: 8月下旬は(先取りにより)もう「秋」扱い → 秋物を先に調べる
+    """『今の季節』と『1つ前の季節』を返す。先取り_日数(既定15日)ぶん前倒しする。
+    例: 先取り15日なら8月17日ごろから「秋」扱い → 秋物を先に調べる
     """
     s = _conf()
-    ahead = int(s.get("先取り_日数", 30))
+    ahead = int(s.get("先取り_日数", 15))
     d = (today or datetime.date.today()) + datetime.timedelta(days=ahead)
     season = _SEASONS[d.month]
     return season, _PREV[season]
+
+
+def is_non_clothing(text):
+    """服以外（バッグ・靴・小物）かどうか。設定の『低優先カテゴリ』の言葉で判定"""
+    try:
+        t = (text or "").lower()
+        return any(w.lower() in t for w in _conf().get("低優先カテゴリ", []))
+    except Exception:
+        return False
+
+
+def skip_item(text):
+    """この商品の調査を『行わない』か。
+    設定『服以外_調査しない』が true で、かつ服以外の商品なら True。
+    ※これだけは順番ではなく、画像判定も通知も行わない（服のせどりに集中するため）。
+    """
+    try:
+        if not _conf().get("服以外_調査しない", False):
+            return False
+        return is_non_clothing(text)
+    except Exception:
+        return False
 
 
 def score_text(text):
@@ -66,7 +91,7 @@ def score_text(text):
         score = 0
         reasons = []
 
-        # 1) 服以外（バッグ等）は減点
+        # 1) 服以外（バッグ等）は大きく減点（『服以外_調査しない』が false の時の保険）
         if any(w.lower() in t for w in s.get("低優先カテゴリ", [])):
             score += int(s.get("低優先カテゴリ_点数", -2))
             reasons.append("服以外")
