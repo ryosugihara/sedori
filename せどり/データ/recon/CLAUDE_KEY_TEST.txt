@@ -1,0 +1,5 @@
+🔑 Anthropic(Claude)のカギ 動作テスト（2026-09-08 11:06）
+
+❌ ANTHROPIC_API_KEY が設定されていません。
+　GitHubの リポジトリ設定 → シークレットと変数 → Actions で、
+　名前が『ANTHROPIC_API_KEY』(一字一句この通り)になっているか確認してください。
