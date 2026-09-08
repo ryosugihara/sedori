@@ -16,7 +16,8 @@ import os
 import sys
 import time
 
-import monitor      # 通知・除外・設定の部品を再利用
+import monitor
+import priority   # 調査の優先順位（服中心・派手優先・季節先取り）      # 通知・除外・設定の部品を再利用
 import souba_match  # 画像照合の部品
 import mercari      # メルカリ検索の部品
 
@@ -197,12 +198,19 @@ def main():
     loose_n = 0
     report_lines = []
 
-    for brand, kw in load_targets():
+    # 調べる順番を優先度で並べ替える（watchlists/priority.json）。
+    # 1日の通知上限(MAX_SENT)やAIの回数制限を、服・派手デザイン・今の季節の
+    # 商品に優先して使うため。通知する条件そのものは変えない。
+    season, prev_season = priority.current_season()
+    print(f"優先順位: {season}物を優先（{prev_season}物は後回し）・服中心・派手デザイン優先")
+    for brand, kw in priority.sort_keywords(load_targets()):
         if sent_count >= MAX_SENT:
             break
         items = mercari.fetch_on_sale(kw)
         time.sleep(1.5)
         print(f"「{kw}」 販売中 {len(items)}件")
+        # 同じキーワードの中でも、優先度の高い商品から先に照合する
+        items = priority.sort_by_score(items, key=lambda r: r.get("name", ""))
         for raw in items:
             total_fetched += 1
             if sent_count >= MAX_SENT:

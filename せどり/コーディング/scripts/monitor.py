@@ -34,6 +34,13 @@ try:
 except Exception:
     souba_match = None
 
+# 調査の優先順位（服中心・派手デザイン優先・季節先取り）。
+# 無くても監視は動く（その場合は今まで通りの順番）。
+try:
+    import priority
+except Exception:
+    priority = None
+
 # --- 設定（ここの数字や名前を変えれば動きを調整できます）-------------------
 SHOP = "https://shop.kind.co.jp"      # KINDAL 通販サイトのアドレス
 BRANDS_FILE = "せどり/データ/watchlists/watch_brands.json"     # KINDAL の見張るブランド一覧
@@ -670,6 +677,9 @@ def scan_profitable():
         return
     souba = load_souba()
     excludes = load_excludes()
+    if priority is not None:
+        season, prev_season = priority.current_season()
+        print(f"優先順位: {season}物を優先（{prev_season}物は後回し）・服中心・派手デザイン優先")
     MAX_HITS = int(os.environ.get("SCAN_MAX", "30"))  # 通知しすぎ防止の上限
     notified_before = set(load_json_file(SCAN_PROFIT_SEEN_FILE, []))
     stats = {}  # 診断レポート用の集計（match_item内部で加算される）
@@ -707,6 +717,12 @@ def scan_profitable():
             except Exception as e:
                 print(f"  取得失敗 ({site}/{b.get('name')}): {e}")
                 continue
+            # 優先度の高い商品（服・派手デザイン・今の季節）から先に照合する。
+            # 1回の通知上限(MAX_HITS)やAIの回数制限を優先度の高い商品に使うため。
+            # 通知する条件そのものは変えない（watchlists/priority.json で調整）。
+            if priority is not None:
+                items = priority.sort_by_score(
+                    items, key=lambda x: f"{x.get('title', '')} {x.get('category', '')}")
             for it in items:
                 total_fetched += 1
                 if sent_count >= MAX_HITS:

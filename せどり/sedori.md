@@ -70,6 +70,19 @@ GitHubリポジトリ: https://github.com/ryosugihara/sedori （作業ブラン�
 ### 予想相場の出し方（四分位モデル）
 似ている売却実例を最大30件集め（`souba.json`『相場_参照する実例の上限件数』）、極端に高い／安い実例（四分位範囲の1.5倍の外）を外れ値として除いてから、**安全（下から25%）／標準（中央値）／強気（下から75%）** の3つの相場を出す。通知するかどうかの利益判定には『標準』を使う（『相場_判定に使う値』で変更可）。根拠の件数が『相場_最低件数』（既定5件）に満たない時は信頼度「低」として一番安い実例で控えめに判定する。通知には3つの相場・根拠件数・信頼度がすべて表示され、出品価格を決める時の参考になる。
 
+## 調査の優先順位（priority.py）
+どの商品から先に調べるかを、商品名のスコアで決める。**通知する/しないの条件は変えず、調べる順番だけを変える**（1日の通知上限 `SCAN_MAX` やAIの回数制限を、価値の高い商品に優先して使うため）。設定は `watchlists/priority.json`。
+
+| 観点 | 加点/減点 | 理由 |
+|---|---|---|
+| バッグ・靴・小物 | −2 | 服のせどりを中心にするため後回し |
+| 派手・個性の強いデザイン（プリント/刺繍/総柄/ダメージ/アーカイブ等） | +2 | 高値で売りやすく利益が出やすい |
+| シンプル（無地系カテゴリで派手ワードが1つも無い） | −2 | 画像判別が難しく、流通量が多く利益も出にくい |
+| 今の季節の服（**約1ヶ月先取り**） | +2 | 次の季節を先に仕入れる |
+| 1つ前の季節だけの服 | −2 | 季節の変わり目に価値が下がるため |
+
+季節は「今日＋`先取り_日数`（既定30日）」の月で判定する（3〜5月=春 / 6〜8月=夏 / 9〜11月=秋 / 12〜2月=冬）。例: 8月下旬にはもう秋物が優先される。
+
 ## 相場DBのしくみ
 - 正体: `せどり/データ/data/souba_db.sqlite`（1ファイルのデータベース）。商品名・値段・ブランド・サイズ・状態・画像URL・写真の指紋を保存。画像そのものは保存しない
 - 収集: `collect_souba.py` が `watch_mercari.json` のキーワードで売り切れを検索（1キーワード最大120件・1.5秒間隔）。すでにある商品はスキップ
@@ -88,6 +101,7 @@ GitHubリポジトリ: https://github.com/ryosugihara/sedori （作業ブラン�
   - メルカリ: `mercari.py`（検索部品）/ `mercari_scan.py`（仕入れスキャン）/ `mercari_test.py`
   - 画像判定: `souba_match.py` / `fingerprint.py` / `geom_verify.py` / `verify_ai.py`
   - 相場DB: `collect_souba.py` / `souba_clean.py`（掃除の基準）/ `souba_db_maintenance.py`（掃除だけ）/ `db_release.py` / `upgrade_embeddings.py` / `discover_brands.py`
+  - 優先順位: `priority.py`（商品名から優先度スコアを出し、調べる順番を決める）
   - 購入記録: `purchases.py`
   - 調整・テスト用: `calibrate*.py` / `clip_test.py` / `color_check.py` / `demo_*.py` / `test_*.py` / `recon.py`
 - `せどり/コーディング/workflows/`: ワークフローの参照用コピー（古い場合がある。読む時も `.github/workflows/` を見る）
@@ -107,6 +121,7 @@ GitHubリポジトリ: https://github.com/ryosugihara/sedori （作業ブラン�
 | `watch_trefac.json` / `watch_rinkan.json` / `watch_hardoff.json` | トレファク・RINKAN・おふもーるで見張るブランド | `name` / `keyword`（検索語）/ `only_keywords` / `profit_only` |
 | `watch_mercari.json` | 相場DB収集・メルカリ内スキャンの検索キーワード | `name`（監視ブランドと同じ名前にする）/ `keywords` |
 | `souba.json` | 相場の設定と手入力の売却実例 | `設定`: 利益通知ライン（既定2,000円）/ 相場モデル（上限件数・最低件数・判定に使う値）/ 相場DB除外キーワード / AI確認の点数ライン、`records[]`: `brand` / `keywords` / `mercari_price` / `memo` |
+| `priority.json` | 調査・通知の優先順位（服中心・派手デザイン優先・季節先取り） | `低優先カテゴリ`(バッグ等) / `派手デザイン` / `シンプル判定_カテゴリ` / `季節の服`(春夏秋冬) / `先取り_日数`(既定30日) |
 | `exclude.json` | 通知から除外する条件 | `ng_keywords` / `brand_ng_keywords` / `price_rules` / `block_urls`（誤通知した商品を二度と送らない永久ブロック） |
 
 数字の調整は環境変数でもできる（ワークフローの `env:` に書く）: `POLL_SECONDS`（チェック間隔）/ `LOOP_MINUTES`（1回の見張り時間）/ `SCAN_MAX`（1回の通知上限）/ `SLOW_SECONDS`（②ブランドのゆっくり巡回間隔）など。サイトへの待ち時間を短く・上限を大きくする変更は理由を報告してから行う。
