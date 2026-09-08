@@ -301,8 +301,19 @@ def _ask_claude(url_a, url_b, title_a, title_b):
         headers={"Content-Type": "application/json",
                  "x-api-key": os.environ["ANTHROPIC_API_KEY"].strip(),
                  "anthropic-version": "2023-06-01"})
-    with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as res:
-        data = json.loads(res.read().decode("utf-8"))
+    try:
+        with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as res:
+            data = json.loads(res.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        detail = ""
+        try:
+            detail = e.read().decode("utf-8", "replace")[:300]
+        except Exception:
+            pass
+        # 残高不足(クレジット切れ)なら、Discordに知らせる（1日1回まで）
+        if e.code == 400 and ("credit" in detail.lower() or "billing" in detail.lower()):
+            _credit_alert()
+        raise
     return _parse("".join(b.get("text", "") for b in data.get("content", [])))
 
 
@@ -333,6 +344,51 @@ def _log(result, url_a, url_b, title_a, title_b):
 
 # 直前の呼び出しが失敗した理由（テスト・診断で「なぜ失敗したか」を数えるために使う）
 LAST_ERROR = None
+
+# APIクレジット切れをDiscordに知らせた記録（1日1回までにするため）
+CREDIT_ALERT_FILE = "せどり/データ/state/claude_credit_alert.json"
+_credit_alerted = [False]  # この実行の中で既に知らせたか
+
+
+def _credit_alert():
+    """Claudeの残高不足を検知した時、Discordに1日1回だけ知らせる。
+    失敗しても本体は止めない。通知後は従来どおり無料AIのみで運用が続く。
+    """
+    if _credit_alerted[0]:
+        return
+    _credit_alerted[0] = True
+    today = datetime.date.today().isoformat()
+    try:
+        with open(CREDIT_ALERT_FILE, "r", encoding="utf-8") as f:
+            if json.load(f).get("last_alert") == today:
+                return  # 今日はもう知らせた（新着監視がこのファイルを保存してくれる）
+    except Exception:
+        pass
+    try:
+        os.makedirs(os.path.dirname(CREDIT_ALERT_FILE), exist_ok=True)
+        with open(CREDIT_ALERT_FILE, "w", encoding="utf-8") as f:
+            json.dump({"last_alert": today,
+                       "_説明": "Claudeのクレジット切れをDiscordに知らせた日（1日1回の重複防止）"},
+                      f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+    webhook = os.environ.get("DISCORD_WEBHOOK_URL", "").strip()
+    if not webhook:
+        return
+    msg = ("⚠️ **AnthropicのAPIクレジットが切れました**\n"
+           "写真の最終確認は無料AI(Gemini)だけの運用に自動で戻っています（監視は止まっていません）。\n"
+           "夜間などGeminiが混雑する時間帯の判定が不安定になるため、続けたい場合は\n"
+           "platform.claude.com の Settings → Billing でクレジットを買い足してください（$5で十分）。\n"
+           "※この通知は1日1回だけ送られます")
+    try:
+        req = urllib.request.Request(
+            webhook, data=json.dumps({"content": msg}).encode(),
+            headers={"Content-Type": "application/json",
+                     "User-Agent": "sedori-bot/1.0 (+https://github.com/ryosugihara/sedori)"})
+        urllib.request.urlopen(req, timeout=30)
+        print("  Discordにクレジット切れを通知しました")
+    except Exception as e:
+        print(f"  クレジット切れ通知の送信に失敗: {e}")
 
 
 def ping():
