@@ -1,5 +1,4 @@
-🔑 Anthropic(Claude)のカギ 動作テスト（2026-09-08 11:10）
+🔑 Anthropic(Claude)のカギ 動作テスト（2026-09-08 11:20）
 
-❌ 接続できましたが、エラーが返りました（HTTP 400）
-　原因: クレジット(前払い残高)が入っていない。
-　→ platform.claude.com の Settings → Billing でクレジットを購入してください。
+✅ カギは正常です！ Claude(claude-haiku-4-5-20251001) が応答しました: 「OK」
+　これで、無料AI(Gemini)が混雑・枠切れの時に自動でClaudeへ切り替わります。
