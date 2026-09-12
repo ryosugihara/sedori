@@ -107,7 +107,7 @@ def try_match_and_send(raw, brand, souba, excludes, notified_before, stats, tag=
     if monitor.is_excluded(it, excludes):
         return False
     # 服以外・シンプル服は調査しない（watchlists/priority.json）
-    why = priority.skip_reason(it["title"])
+    why = priority.skip_reason(it["title"], it.get("category", ""))
     if why:
         stats[f"reason_その他_{why}"] = stats.get(f"reason_その他_{why}", 0) + 1
         return False
@@ -243,7 +243,7 @@ def main():
                 continue
             # 服以外・シンプル服は調査しない（服のせどりに集中するため。
             # 3つのスイッチは watchlists/priority.json で切り替えられる）
-            why = priority.skip_reason(it["title"])
+            why = priority.skip_reason(it["title"], it.get("category", ""))
             if why:
                 stats[f"reason_その他_{why}"] = stats.get(f"reason_その他_{why}", 0) + 1
                 continue

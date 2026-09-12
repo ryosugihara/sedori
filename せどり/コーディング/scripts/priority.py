@@ -3,12 +3,14 @@
 調査・通知の優先順位 部品（watchlists/priority.json が設定の正）
 
 このプログラムがすること:
-  1. 『調査しない商品』を見分ける（skip_reason）。次の3つのどれかに当てはまる商品は、
-     画像判定も通知も一切行わない（服のせどりに集中するため）:
-       ① 服以外の言葉がある（バッグ・靴・財布・帽子など）
-       ② 服の言葉が1つも無い（例:「ミューズトゥ」のようなバッグの型名だけの商品名）
-       ③ シンプルな服（無地のTシャツ・黒ズボン等。派手さを示す言葉が1つも無い）
-     ①②③はそれぞれ priority.json のスイッチで個別に切り替えられる
+  1. 『調査しない商品』を見分ける。服以外かどうかは次の3段構えで判断する
+     （どれも priority.json のスイッチで個別に切り替えられる）:
+       ① 名前の言葉 …… 「バッグ」「財布」等がはっきり書いてあれば服以外
+       ② サイトのカテゴリ …… 仕入れ先が付けている分類。名前が雑でも分類は正しいことが多い
+       ③ 写真そのもの …… CLIPというAIが写真と文章を同じ土俵で比べられる性質を使い、
+          「服の写真か・バッグの写真か」を名前に頼らず判定する（安く出ている狙い目の
+          商品は名前が雑なことが多いため、これが最後の砦になる）
+     加えて、シンプルな服（無地のTシャツ・黒ズボン等）も調査対象から外せる
   2. 商品名（とカテゴリ）から優先度スコアを計算する
        - 派手・個性の強いデザイン: 加点 …… 高値で売りやすいため
        - 無地・シンプルな服: 減点 …… 画像判別が難しく利益も出にくいため
@@ -97,15 +99,50 @@ def is_simple(text):
         return False
 
 
-def skip_reason(text):
+def category_says(category):
+    """仕入れ先サイトが付けている分類から判断する。
+    返り値: "服以外" / "服" / None（分類が無い・どちらとも言えない）
+    名前より信頼できる情報なので、名前の判定より先に使う。
+    """
+    try:
+        c = (category or "").strip().lower()
+        if not c:
+            return None
+        s = _conf()
+        if not s.get("カテゴリで判定する", False):
+            return None
+        if _has(c, s.get("服以外のカテゴリ", [])):
+            return "服以外"
+        if _has(c, s.get("服のカテゴリ_サイト分類", [])):
+            return "服"
+        return None
+    except Exception:
+        return None
+
+
+def skip_reason(text, category=None):
     """この商品を『調査しない』理由を返す。調査してよければ None。
-    3つのスイッチ（priority.json）で個別に切り替えられる:
-      服以外_調査しない / 服と確認できない商品_調査しない / シンプル服_調査しない
+    判断の順番（確実な情報から順に見る）:
+      1. サイトのカテゴリが『服』と言っている → 名前が雑でも調査する（取りこぼし防止）
+      2. サイトのカテゴリが『服以外』と言っている → 調査しない
+      3. 名前に服以外の言葉がある → 調査しない
+      4. （スイッチがオンなら）服の言葉が1つも無い → 調査しない ※既定はオフ
+      5. シンプルな服 → 調査しない
+    写真での判定は、写真の指紋を計算したあとに skip_by_image で別途行う。
     """
     try:
         s = _conf()
         if not s:
             return None
+        says = category_says(category)
+        if says == "服":
+            # サイトが『服』と分類している物は、名前が雑でも調査する。
+            # ただしシンプル服の除外だけは効かせる
+            if s.get("シンプル服_調査しない", False) and is_simple(text):
+                return "シンプル服"
+            return None
+        if says == "服以外":
+            return "服以外(カテゴリ)"
         if s.get("服以外_調査しない", False) and is_non_clothing(text):
             return "服以外"
         if s.get("服と確認できない商品_調査しない", False) and not is_clothing(text):
@@ -115,6 +152,82 @@ def skip_reason(text):
         return None
     except Exception:
         return None  # 判定に失敗したら調査する（通知を止めない）
+
+
+# --- 写真そのものから「服かどうか」を判定する（名前に頼らない最後の砦）------------
+# CLIPは「写真」と「文章」を同じ土俵（同じ形の指紋）で比べられる。
+# あらかじめ『a photo of a jacket』等の文章を指紋にしておき、商品写真の指紋と
+# どれが一番近いかを見るだけで、名前が無くても種類が分かる。
+# 写真の指紋は画像照合ですでに計算しているので、追加の費用はほぼゼロ。
+_img_labels = {"mat": None, "groups": None}
+
+
+def _label_vectors():
+    """判定用の文章を指紋にして覚えておく（初回だけ）。使えなければ None"""
+    if _img_labels["mat"] is not None:
+        return _img_labels["mat"], _img_labels["groups"]
+    try:
+        import numpy as np
+        import fingerprint
+        words = _conf().get("写真判定_言葉", {})
+        if not words:
+            return None, None
+        vecs, groups = [], []
+        for group, phrases in words.items():
+            for phrase in phrases:
+                vecs.append(fingerprint.embed_text(phrase))
+                groups.append(group)
+        _img_labels["mat"] = np.stack(vecs)
+        _img_labels["groups"] = groups
+        return _img_labels["mat"], groups
+    except Exception as e:
+        print(f"  写真判定の準備に失敗（写真判定は休止）: {e}")
+        _img_labels["mat"], _img_labels["groups"] = None, None
+        return None, None
+
+
+def image_scores(vec_clip):
+    """写真の指紋から、グループごとの近さを返す。例 {"服":0.27,"バッグ":0.21,...}
+    使えない時は空の辞書。
+    """
+    try:
+        mat, groups = _label_vectors()
+        if mat is None or vec_clip is None:
+            return {}
+        sims = mat @ vec_clip
+        best = {}
+        for g, sim in zip(groups, sims):
+            sim = float(sim)
+            if sim > best.get(g, -1):
+                best[g] = sim  # そのグループで一番近かった文章の点数
+        return best
+    except Exception:
+        return {}
+
+
+def skip_by_image(vec_clip):
+    """写真を見て『服以外』と判断できたら理由を返す。服（または自信が無い）なら None。
+    服以外のグループが服を『服以外と判断する差』以上 上回った時だけ弾く
+    （差を大きくすると慎重になり、服の取りこぼしが減る）。
+    """
+    try:
+        s = _conf()
+        if not s.get("写真で判定する", False):
+            return None
+        scores = image_scores(vec_clip)
+        if not scores or "服" not in scores:
+            return None
+        clothes = scores["服"]
+        others = {g: v for g, v in scores.items() if g != "服"}
+        if not others:
+            return None
+        top_g = max(others, key=others.get)
+        margin = float(s.get("写真判定_服以外と判断する差", 0.03))
+        if others[top_g] - clothes >= margin:
+            return f"服以外(写真判定:{top_g})"
+        return None
+    except Exception:
+        return None
 
 
 def skip_item(text):

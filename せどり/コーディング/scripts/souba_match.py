@@ -252,6 +252,19 @@ def match_item(item, souba, stats=None, min_profit=None):
             _count("reason_その他_画像取得失敗")
             return None
 
+        # 写真そのものを見て『服以外（バッグ・靴・小物）』と分かったら、ここで打ち切る。
+        # 商品名が雑な出品でも種類が分かるのが利点。指紋はもう計算済みなので費用はゼロ。
+        # （呼び出し元が通知を止められるよう、理由を item にも残す）
+        try:
+            import priority
+            why = priority.skip_by_image(vec_c)
+            if why:
+                item["_priority_skip"] = why
+                _count(f"reason_その他_{why}")
+                return None
+        except Exception:
+            pass
+
         mat_c, mat_d, rs = got
         sims_c = mat_c @ vec_c  # CLIP（見た目の系統）の近さ
         sims_d = mat_d @ vec_d  # DINO（同一商品か）の近さ

@@ -556,8 +556,8 @@ def check_source(brands, seen, first_run, get_items, do_slow=True):
                 # ここは①優先ブランドの新着も通る道なので、この絞り込みが
                 # 効いていないと服以外の通知が出続ける（watchlists/priority.json）。
                 if priority is not None:
-                    why = priority.skip_reason(
-                        f"{it.get('title', '')} {it.get('category', '')}")
+                    why = priority.skip_reason(it.get("title", ""),
+                                               it.get("category", ""))
                     if why:
                         skipped_by_priority[why] = skipped_by_priority.get(why, 0) + 1
                         continue
@@ -568,6 +568,13 @@ def check_source(brands, seen, first_run, get_items, do_slow=True):
                 if image_match_ready() and it.get("image"):
                     mp = souba["notify_line"] if profit_only else None
                     match = souba_match.match_item(it, souba, min_profit=mp)
+                # 写真を見て『服以外』と判定された商品は、相場照合の結果に関わらず
+                # 通知しない（①優先ブランドは相場が見つからなくても通知するため、
+                # ここで止めないとバッグ等がすり抜ける）
+                if it.get("_priority_skip"):
+                    why = it["_priority_skip"]
+                    skipped_by_priority[why] = skipped_by_priority.get(why, 0) + 1
+                    continue
                 if match:
                     it["img_match"] = match  # 通知カードに表示するため覚えておく
                 if profit_only:
@@ -743,7 +750,7 @@ def scan_profitable():
                     continue
                 # 服以外・シンプル服は調査しない（服のせどりに集中するため。
                 # 3つのスイッチは watchlists/priority.json で切り替えられる）
-                why = (priority.skip_reason(f"{it.get('title', '')} {it.get('category', '')}")
+                why = (priority.skip_reason(it.get("title", ""), it.get("category", ""))
                        if priority is not None else None)
                 if why:
                     stats[f"reason_その他_{why}"] = stats.get(f"reason_その他_{why}", 0) + 1
