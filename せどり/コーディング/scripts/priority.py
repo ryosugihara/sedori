@@ -205,6 +205,70 @@ def image_scores(vec_clip):
         return {}
 
 
+_pattern_labels = {"mat": None, "groups": None}
+
+
+def _pattern_vectors():
+    """柄判定用の文章を指紋にして覚えておく（初回だけ）"""
+    if _pattern_labels["mat"] is not None:
+        return _pattern_labels["mat"], _pattern_labels["groups"]
+    try:
+        import numpy as np
+        import fingerprint
+        words = _conf().get("写真柄判定_言葉", {})
+        if not words:
+            return None, None
+        vecs, groups = [], []
+        for group, phrases in words.items():
+            for phrase in phrases:
+                vecs.append(fingerprint.embed_text(phrase))
+                groups.append(group)
+        _pattern_labels["mat"] = np.stack(vecs)
+        _pattern_labels["groups"] = groups
+        return _pattern_labels["mat"], groups
+    except Exception as e:
+        print(f"  柄判定の準備に失敗（柄判定は休止）: {e}")
+        _pattern_labels["mat"], _pattern_labels["groups"] = None, None
+        return None, None
+
+
+def pattern_scores(vec_clip):
+    """写真の指紋から『派手』『単調』それぞれの近さを返す。例 {"派手":0.24,"単調":0.26}"""
+    try:
+        mat, groups = _pattern_vectors()
+        if mat is None or vec_clip is None:
+            return {}
+        sims = mat @ vec_clip
+        best = {}
+        for g, sim in zip(groups, sims):
+            sim = float(sim)
+            if sim > best.get(g, -1):
+                best[g] = sim
+        return best
+    except Exception:
+        return {}
+
+
+def skip_by_pattern(vec_clip):
+    """写真を見て『単調なデザインの服』と判断できたら理由を返す。
+    柄・装飾がある（または自信が無い）なら None。
+    商品名が雑でも見た目で判断できるのが利点（名前だけの判定の穴を埋める）。
+    """
+    try:
+        s = _conf()
+        if not s.get("写真で柄を判定する", False):
+            return None
+        sc = pattern_scores(vec_clip)
+        if not sc or "派手" not in sc or "単調" not in sc:
+            return None
+        margin = float(s.get("写真柄判定_単調と判断する差", 0.03))
+        if sc["単調"] - sc["派手"] >= margin:
+            return "単調デザイン(写真判定)"
+        return None
+    except Exception:
+        return None
+
+
 def skip_by_image(vec_clip):
     """写真を見て『服以外』と判断できたら理由を返す。服（または自信が無い）なら None。
     服以外のグループが服を『服以外と判断する差』以上 上回った時だけ弾く
@@ -252,11 +316,17 @@ def score_text(text):
             score += int(s.get("低優先カテゴリ_点数", -2))
             reasons.append("服以外")
 
-        # 2) 派手・個性デザインは加点
+        # 2) 派手・個性デザインは加点（見た目の派手さ）
         hade = any(w.lower() in t for w in s.get("派手デザイン", []))
         if hade:
             score += int(s.get("派手デザイン_点数", 2))
             reasons.append("派手デザイン")
+
+        # 2-2) 希少さ・状態の言葉（アーカイブ・限定等）も加点する。
+        # ただし見た目の派手さとは別物なので、シンプル判定には使わない
+        if any(w.lower() in t for w in s.get("価値ワード", [])):
+            score += int(s.get("価値ワード_点数", 3))
+            reasons.append("希少価値")
 
         # 3) シンプル（無地系の服で、派手の言葉が1つも無い）は減点
         if not hade and any(w.lower() in t for w in s.get("シンプル判定_カテゴリ", [])):

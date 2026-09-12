@@ -257,7 +257,8 @@ def match_item(item, souba, stats=None, min_profit=None):
         # （呼び出し元が通知を止められるよう、理由を item にも残す）
         try:
             import priority
-            why = priority.skip_by_image(vec_c)
+            # 服以外かどうか＋単調なデザインかどうかを、写真から判定する
+            why = priority.skip_by_image(vec_c) or priority.skip_by_pattern(vec_c)
             if why:
                 item["_priority_skip"] = why
                 _count(f"reason_その他_{why}")
