@@ -106,6 +106,11 @@ def try_match_and_send(raw, brand, souba, excludes, notified_before, stats, tag=
     }
     if monitor.is_excluded(it, excludes):
         return False
+    # 服以外・シンプル服は調査しない（watchlists/priority.json）
+    why = priority.skip_reason(it["title"])
+    if why:
+        stats[f"reason_その他_{why}"] = stats.get(f"reason_その他_{why}", 0) + 1
+        return False
     m = souba_match.match_item(it, souba, stats=stats, min_profit=souba["notify_line"])
     # 「同じと確認できた同デザイン」だけ送る（未確認の「似た系統」は送らない）
     if (not m or m["rank"] != "同デザイン"
@@ -236,10 +241,11 @@ def main():
             }
             if monitor.is_excluded(it, excludes):
                 continue
-            # 服以外（バッグ・靴・小物）は調査しない（服のせどりに集中するため。
-            # priority.json の『服以外_調査しない』を false にすれば従来通り調べる）
-            if priority.skip_item(it["title"]):
-                stats["reason_その他_服以外"] = stats.get("reason_その他_服以外", 0) + 1
+            # 服以外・シンプル服は調査しない（服のせどりに集中するため。
+            # 3つのスイッチは watchlists/priority.json で切り替えられる）
+            why = priority.skip_reason(it["title"])
+            if why:
+                stats[f"reason_その他_{why}"] = stats.get(f"reason_その他_{why}", 0) + 1
                 continue
             m = souba_match.match_item(it, souba, stats=stats, min_profit=souba["notify_line"])
             checked += 1

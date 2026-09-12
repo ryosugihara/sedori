@@ -510,6 +510,7 @@ def check_source(brands, seen, first_run, get_items, do_slow=True):
               短い間隔で見張りつつ、②は少し長い間隔で見張るための仕組み。
     """
     new_items = []
+    skipped_by_priority = {}  # 服以外・シンプル服として調査しなかった件数（理由ごと）
     excludes = load_excludes()  # 通知しない条件を読み込む
     souba = load_souba()        # 利益予測の設定(手数料・送料・通知ライン)
     for b in brands:
@@ -551,6 +552,15 @@ def check_source(brands, seen, first_run, get_items, do_slow=True):
                     continue
                 if not matches_only(it, only_kw):
                     continue
+                # 服以外（バッグ・靴・小物）・シンプル服は通知しない。
+                # ここは①優先ブランドの新着も通る道なので、この絞り込みが
+                # 効いていないと服以外の通知が出続ける（watchlists/priority.json）。
+                if priority is not None:
+                    why = priority.skip_reason(
+                        f"{it.get('title', '')} {it.get('category', '')}")
+                    if why:
+                        skipped_by_priority[why] = skipped_by_priority.get(why, 0) + 1
+                        continue
                 # 商品写真をメルカリ相場DBと見比べる（画像の指紋で照合）。
                 # ②ブランドは利益ライン以上の時だけ通知するので、利益ライン未満は
                 # 重い答え合わせを省いて高速化する（①ブランドは表示用に常に照合）。
@@ -571,7 +581,9 @@ def check_source(brands, seen, first_run, get_items, do_slow=True):
                 keep.append(it)
             skipped = len(fresh) - len(keep)
             new_items.extend(keep)
-            print(f"  新着 {len(fresh)} 件: {key}（通知 {len(keep)} / 対象外 {skipped}）")
+            pr = ("・服以外/シンプル " + "、".join(f"{k}{v}" for k, v in skipped_by_priority.items())
+                  if skipped_by_priority else "")
+            print(f"  新着 {len(fresh)} 件: {key}（通知 {len(keep)} / 対象外 {skipped}{pr}）")
 
         # 見た商品リストを更新（今ある商品IDを全部覚える）
         seen[key] = sorted(seen_ids | set(current_ids))
@@ -729,10 +741,12 @@ def scan_profitable():
                     break
                 if is_excluded(it, excludes):
                     continue
-                # 服以外（バッグ・靴・小物）は調査しない（服のせどりに集中するため）
-                if priority is not None and priority.skip_item(
-                        f"{it.get('title', '')} {it.get('category', '')}"):
-                    stats["reason_その他_服以外"] = stats.get("reason_その他_服以外", 0) + 1
+                # 服以外・シンプル服は調査しない（服のせどりに集中するため。
+                # 3つのスイッチは watchlists/priority.json で切り替えられる）
+                why = (priority.skip_reason(f"{it.get('title', '')} {it.get('category', '')}")
+                       if priority is not None else None)
+                if why:
+                    stats[f"reason_その他_{why}"] = stats.get(f"reason_その他_{why}", 0) + 1
                     continue
                 dedup = (it.get("shop"), str(it.get("id")))
                 if dedup in seen_keys:

@@ -3,8 +3,12 @@
 調査・通知の優先順位 部品（watchlists/priority.json が設定の正）
 
 このプログラムがすること:
-  1. 服以外（バッグ・靴・小物）かどうかを判定する
-       → 設定『服以外_調査しない』が true なら、その商品は調査そのものを行わない
+  1. 『調査しない商品』を見分ける（skip_reason）。次の3つのどれかに当てはまる商品は、
+     画像判定も通知も一切行わない（服のせどりに集中するため）:
+       ① 服以外の言葉がある（バッグ・靴・財布・帽子など）
+       ② 服の言葉が1つも無い（例:「ミューズトゥ」のようなバッグの型名だけの商品名）
+       ③ シンプルな服（無地のTシャツ・黒ズボン等。派手さを示す言葉が1つも無い）
+     ①②③はそれぞれ priority.json のスイッチで個別に切り替えられる
   2. 商品名（とカテゴリ）から優先度スコアを計算する
        - 派手・個性の強いデザイン: 加点 …… 高値で売りやすいため
        - 無地・シンプルな服: 減点 …… 画像判別が難しく利益も出にくいため
@@ -13,8 +17,9 @@
 
 使い方（スキャン側から）:
     import priority
-    if priority.skip_item(name):      # 服以外なら調査しない
-        continue
+    why = priority.skip_reason(商品名 + " " + カテゴリ)
+    if why:                           # 服以外・シンプル服なら調査しない
+        continue                      # why には理由（"服以外" 等）が入る
     items = priority.sort_by_score(items, key=lambda it: it.get("name", ""))
     targets = priority.sort_keywords(targets)  # (ブランド, キーワード) のリスト
 
@@ -57,26 +62,64 @@ def current_season(today=None):
     return season, _PREV[season]
 
 
+def _has(text, words):
+    """文章に、言葉のリストのどれかが含まれるか"""
+    t = (text or "").lower()
+    return any(w.lower() in t for w in words if w)
+
+
 def is_non_clothing(text):
-    """服以外（バッグ・靴・小物）かどうか。設定の『低優先カテゴリ』の言葉で判定"""
+    """服以外（バッグ・靴・小物）の言葉が入っているか（設定の『低優先カテゴリ』）"""
     try:
-        t = (text or "").lower()
-        return any(w.lower() in t for w in _conf().get("低優先カテゴリ", []))
+        return _has(text, _conf().get("低優先カテゴリ", []))
     except Exception:
         return False
+
+
+def is_clothing(text):
+    """服だと分かる言葉（ジャケット・シャツ・パンツ等）が入っているか。
+    バッグの型名だけの商品名（例:「ミューズトゥ」）は、ここで False になる。
+    """
+    try:
+        return _has(text, _conf().get("服のカテゴリ", []))
+    except Exception:
+        return True  # 設定が読めない時は「服」とみなす（通知を止めないため）
+
+
+def is_simple(text):
+    """シンプルな服か（無地系のカテゴリで、派手さを示す言葉が1つも無い）"""
+    try:
+        s = _conf()
+        if _has(text, s.get("派手デザイン", [])):
+            return False
+        return _has(text, s.get("シンプル判定_カテゴリ", []))
+    except Exception:
+        return False
+
+
+def skip_reason(text):
+    """この商品を『調査しない』理由を返す。調査してよければ None。
+    3つのスイッチ（priority.json）で個別に切り替えられる:
+      服以外_調査しない / 服と確認できない商品_調査しない / シンプル服_調査しない
+    """
+    try:
+        s = _conf()
+        if not s:
+            return None
+        if s.get("服以外_調査しない", False) and is_non_clothing(text):
+            return "服以外"
+        if s.get("服と確認できない商品_調査しない", False) and not is_clothing(text):
+            return "服と確認できない"
+        if s.get("シンプル服_調査しない", False) and is_simple(text):
+            return "シンプル服"
+        return None
+    except Exception:
+        return None  # 判定に失敗したら調査する（通知を止めない）
 
 
 def skip_item(text):
-    """この商品の調査を『行わない』か。
-    設定『服以外_調査しない』が true で、かつ服以外の商品なら True。
-    ※これだけは順番ではなく、画像判定も通知も行わない（服のせどりに集中するため）。
-    """
-    try:
-        if not _conf().get("服以外_調査しない", False):
-            return False
-        return is_non_clothing(text)
-    except Exception:
-        return False
+    """この商品の調査を『行わない』か（True/False）。理由が要る時は skip_reason を使う"""
+    return skip_reason(text) is not None
 
 
 def score_text(text):
