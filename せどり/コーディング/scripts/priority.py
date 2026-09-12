@@ -88,6 +88,22 @@ def is_clothing(text):
         return True  # 設定が読めない時は「服」とみなす（通知を止めないため）
 
 
+def is_flashy(text):
+    """派手・個性的なデザインを示す言葉が入っているか（総柄・プリント・刺繍等）"""
+    try:
+        return _has(text, _conf().get("派手デザイン", []))
+    except Exception:
+        return False
+
+
+def only_distinctive():
+    """①優先ブランドの新着を『派手か利益が出る物』だけに絞る設定か"""
+    try:
+        return bool(_conf().get("優先ブランド_派手か利益が出る物だけ通知する", False))
+    except Exception:
+        return False
+
+
 def is_simple(text):
     """シンプルな服か（無地系のカテゴリで、派手さを示す言葉が1つも無い）"""
     try:

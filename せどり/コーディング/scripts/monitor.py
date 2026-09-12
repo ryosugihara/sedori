@@ -585,6 +585,20 @@ def check_source(brands, seen, first_run, get_items, do_slow=True):
                             or match["profit"] is None
                             or match["profit"] < souba["notify_line"]):
                         continue
+                elif priority is not None and priority.only_distinctive():
+                    # ①優先ブランドは今まで新着を全部通知していたが、単調な服が
+                    # 多く混ざるため『派手な言葉があるか、利益が出る物』だけに絞る。
+                    # 商品名が雑でも利益が出るなら通知されるので、狙い目は逃さない。
+                    # （priority.json の『優先ブランド_派手か利益が出る物だけ通知する』
+                    #   を false にすると、今まで通り全部通知する）
+                    flashy = priority.is_flashy(
+                        f"{it.get('title', '')} {it.get('category', '')}")
+                    profitable = (match and match.get("profit") is not None
+                                  and match["profit"] >= souba["notify_line"])
+                    if not flashy and not profitable:
+                        skipped_by_priority["単調(優先ブランド)"] = (
+                            skipped_by_priority.get("単調(優先ブランド)", 0) + 1)
+                        continue
                 keep.append(it)
             skipped = len(fresh) - len(keep)
             new_items.extend(keep)
