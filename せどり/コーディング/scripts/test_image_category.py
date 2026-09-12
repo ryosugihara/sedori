@@ -43,6 +43,16 @@ NON_CLOTHING_WORDS = ["バッグ", "バック", "リュック", "ショルダー
                       "グローブ", "ネクタイ", "キーケース", "キーホルダー", "カードケース",
                       "名刺入れ", "コインケース", "小銭入れ", "パンプス", "ローファー",
                       "サンダル", "靴下", "ソックス", "香水", "傘"]
+# 柄の有無の正解ラベルを付けるための言葉
+PATTERN_WORDS = ["総柄", "柄物", "プリント", "グラフィック", "刺繍", "ワッペン", "パッチ",
+                 "スタッズ", "スパンコール", "ダメージ", "クラッシュ", "ペイント", "ペンキ",
+                 "タイダイ", "カモフラ", "迷彩", "レオパード", "ヒョウ柄", "ゼブラ",
+                 "ペイズリー", "チェック", "ストライプ", "ボーダー", "花柄", "ボタニカル",
+                 "スカル", "ドクロ", "バンダナ", "アロハ"]
+PLAIN_WORDS = ["無地", "プレーン", "ソリッド", "シンプル"]
+COLOR_WORDS = ["黒", "ブラック", "白", "ホワイト", "紺", "ネイビー", "グレー", "ベージュ",
+               "カーキ", "ブラウン", "茶", "インディゴ"]
+
 CLOTHING_WORDS = ["デニム", "tシャツ", "ｔシャツ", "シャツ", "ジャケット", "パーカー",
                   "ニット", "コート", "スキニー", "パンツ", "スウェット", "ジャージ",
                   "ライダース", "ブルゾン", "カーディガン", "ダウン", "トラックジャケット"]
@@ -186,6 +196,64 @@ def main():
                       key=lambda s: -(s[2] - s[1]))[:5]
     for lab, c, o, g, name in hit_list:
         lines.append(f"  差{o - c:+.3f} ({g}と判定) {name[:45]}")
+
+    # ========== ここから「柄があるか・単調か」の精度測定 ==========
+    lines.append("")
+    lines.append("=" * 60)
+    lines.append("柄判定（派手な柄か・無地で単調か）の精度測定")
+
+    def pattern_label(name):
+        """商品名から『派手』『単調』の正解ラベルを付ける。決められなければ None"""
+        nm = (name or "").lower()
+        if any(w.lower() in nm for w in PATTERN_WORDS):
+            return "派手"
+        if any(w.lower() in nm for w in PLAIN_WORDS):
+            return "単調"
+        # 色名が書いてあり、柄の言葉が1つも無い服は『単調』とみなす
+        if any(w.lower() in nm for w in COLOR_WORDS):
+            return "単調"
+        return None
+
+    pat = []  # (ラベル, 派手の点数, 単調の点数, 商品名)
+    for lab, vec, name in samples:
+        if lab != "服":
+            continue  # 服だけで測る（バッグ等は対象外）
+        plab = pattern_label(name)
+        if not plab:
+            continue
+        sc = priority.pattern_scores(vec)
+        if not sc or "派手" not in sc or "単調" not in sc:
+            continue
+        pat.append((plab, sc["派手"], sc["単調"], name or ""))
+
+    n_hade = sum(1 for x in pat if x[0] == "派手")
+    n_plain = sum(1 for x in pat if x[0] == "単調")
+    lines.append(f"  測定に使えたデータ: 派手 {n_hade}件 / 単調 {n_plain}件")
+    if n_hade >= 20 and n_plain >= 20:
+        lines.append("")
+        lines.append("  差      派手な服を誤って捨てる率   単調な服を正しく弾く率")
+        best_p = None
+        for margin in (0.00, 0.01, 0.02, 0.03, 0.05, 0.08):
+            miss = sum(1 for l, h, pl, n in pat if l == "派手" and pl - h >= margin)
+            catch = sum(1 for l, h, pl, n in pat if l == "単調" and pl - h >= margin)
+            miss_r = miss / n_hade * 100
+            catch_r = catch / n_plain * 100
+            lines.append(f"  {margin:.2f}    {miss_r:5.1f}%                  {catch_r:5.1f}%")
+            if miss_r <= 3.0 and (best_p is None or catch_r > best_p[1]):
+                best_p = (margin, catch_r, miss_r)
+        lines.append("")
+        if best_p:
+            lines.append(f"  → 推奨: 差 {best_p[0]:.2f}（派手な服の取りこぼし {best_p[2]:.1f}% / "
+                         f"単調な服を {best_p[1]:.1f}% 弾ける）")
+        else:
+            lines.append("  → どの設定でも派手な服の取りこぼしが3%を超える。柄判定は有効にしない方がよい")
+        lines.append("")
+        lines.append("  【要確認: 派手なのに単調と判定された商品（上位5件）】")
+        for l, h, pl, n in sorted([x for x in pat if x[0] == "派手" and x[2] > x[1]],
+                                  key=lambda x: -(x[2] - x[1]))[:5]:
+            lines.append(f"    差{pl - h:+.3f} {n[:45]}")
+    else:
+        lines.append("  データ不足のため測定できませんでした")
 
     report = "\n".join(lines)
     print(report)
