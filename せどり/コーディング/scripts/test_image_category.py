@@ -106,22 +106,28 @@ def main():
 
     con = sqlite3.connect(DB_FILE)
     rows = con.execute(
-        "SELECT name, keyword, vec FROM items WHERE vec IS NOT NULL"
+        "SELECT name, keyword, vec, vec2 FROM items "
+        "WHERE vec IS NOT NULL AND vec2 IS NOT NULL"
     ).fetchall()
     con.close()
     print(f"相場DBから {len(rows)} 件を読み込みました")
 
+    def unit(blob):
+        """指紋を読み込んで長さ1にそろえる（近さの計算を正確にするため）"""
+        v = np.frombuffer(blob, dtype=np.float16).astype("float32")
+        n = np.linalg.norm(v)
+        return None if n == 0 else v / n
+
     # 正解ラベルが付けられる物だけを測定に使う
-    samples = []  # (ラベル, 指紋, 商品名)
-    for name, keyword, vec in rows:
+    samples = []  # (ラベル, CLIP指紋, 商品名, DINOv2指紋)
+    for name, keyword, vec, vec2 in rows:
         lab = label_of(keyword, name)
         if not lab:
             continue
-        v = np.frombuffer(vec, dtype=np.float16).astype("float32")
-        n = np.linalg.norm(v)
-        if n == 0:
+        v, v2 = unit(vec), unit(vec2)
+        if v is None or v2 is None:
             continue
-        samples.append((lab, v / n, name or ""))
+        samples.append((lab, v, name or "", v2))
     n_cloth = sum(1 for s in samples if s[0] == "服")
     n_other = sum(1 for s in samples if s[0] == "服以外")
     print(f"測定に使えるデータ: 服 {n_cloth}件 / 服以外 {n_other}件")
@@ -135,7 +141,7 @@ def main():
 
     # 全件のグループ別スコアを計算（文章の指紋は初回1回だけ作られる）
     scored = []  # (ラベル, 服の点数, 服以外で一番高い点数, 一番近いグループ, 商品名)
-    for lab, vec, name in samples:
+    for lab, vec, name, vec2 in samples:
         sc = priority.image_scores(vec)
         if not sc or "服" not in sc:
             continue
@@ -205,9 +211,15 @@ def main():
     def pattern_label(name):
         """商品名から『派手』『単調』の正解ラベルを付ける。決められなければ None"""
         nm = (name or "").lower()
-        if any(w.lower() in nm for w in PATTERN_WORDS):
+        has_pat = any(w.lower() in nm for w in PATTERN_WORDS)
+        has_plain = any(w.lower() in nm for w in PLAIN_WORDS)
+        # 両方の言葉がある商品名は、どちらとも言えないので測定から外す
+        # （例:「スタッズ Tシャツ 無地T 黒」）
+        if has_pat and has_plain:
+            return None
+        if has_pat:
             return "派手"
-        if any(w.lower() in nm for w in PLAIN_WORDS):
+        if has_plain:
             return "単調"
         # 色名が書いてあり、柄の言葉が1つも無い服は『単調』とみなす
         if any(w.lower() in nm for w in COLOR_WORDS):
@@ -215,7 +227,7 @@ def main():
         return None
 
     pat = []  # (ラベル, 派手の点数, 単調の点数, 商品名)
-    for lab, vec, name in samples:
+    for lab, vec, name, vec2 in samples:
         if lab != "服":
             continue  # 服だけで測る（バッグ等は対象外）
         plab = pattern_label(name)
@@ -254,6 +266,62 @@ def main():
             lines.append(f"    差{pl - h:+.3f} {n[:45]}")
     else:
         lines.append("  データ不足のため測定できませんでした")
+
+    # ========== 平均像くらべ（保存済みの指紋から派手/単調を見分ける）==========
+    # やり方: 過去の『派手な服たち』『単調な服たち』それぞれの指紋の平均（＝平均像）を
+    # 作り、新しい商品がどちらの平均像に近いかで判定する。実際の商品から学ぶぶん、
+    # 文章と比べるゼロショットより細部に強いはず。
+    # 公平に測るため、平均像を作る7割と、答え合わせに使う3割に分けて測定する。
+    lines.append("")
+    lines.append("=" * 60)
+    lines.append("平均像くらべ（保存済み指紋から派手/単調を見分ける）")
+
+    pat_all = []  # (ラベル, CLIP指紋, DINO指紋, 商品名)
+    for lab, vec, name, vec2 in samples:
+        if lab != "服":
+            continue
+        plab = pattern_label(name)
+        if plab:
+            pat_all.append((plab, vec, vec2, name))
+
+    import random
+    random.seed(7)  # 毎回同じ分け方になるように
+    random.shuffle(pat_all)
+    split = int(len(pat_all) * 0.7)
+    train, test = pat_all[:split], pat_all[split:]
+    lines.append(f"  平均像を作るのに使う: {len(train)}件 / 答え合わせに使う: {len(test)}件")
+
+    for which, idx in (("CLIP", 1), ("DINOv2", 2)):
+        tr_h = [t[idx] for t in train if t[0] == "派手"]
+        tr_p = [t[idx] for t in train if t[0] == "単調"]
+        if len(tr_h) < 20 or len(tr_p) < 20:
+            lines.append(f"  {which}: 学習データ不足")
+            continue
+        c_h = np.mean(np.stack(tr_h), axis=0)
+        c_p = np.mean(np.stack(tr_p), axis=0)
+        c_h = c_h / (np.linalg.norm(c_h) or 1)
+        c_p = c_p / (np.linalg.norm(c_p) or 1)
+        # 単調の平均像に近いほど差が大きくなる
+        diffs = [(t[0], float(t[idx] @ c_p - t[idx] @ c_h)) for t in test]
+        n_h = sum(1 for l, d in diffs if l == "派手")
+        n_p = sum(1 for l, d in diffs if l == "単調")
+        if not n_h or not n_p:
+            continue
+        lines.append("")
+        lines.append(f"  【{which}の平均像くらべ】答え合わせ 派手{n_h}件 / 単調{n_p}件")
+        lines.append("    差      派手を誤って捨てる率   単調を正しく弾く率")
+        best_c = None
+        for margin in (0.00, 0.01, 0.02, 0.03, 0.05, 0.08, 0.12):
+            miss = sum(1 for l, d in diffs if l == "派手" and d >= margin) / n_h * 100
+            catch = sum(1 for l, d in diffs if l == "単調" and d >= margin) / n_p * 100
+            lines.append(f"    {margin:.2f}    {miss:5.1f}%                {catch:5.1f}%")
+            if miss <= 3.0 and (best_c is None or catch > best_c[1]):
+                best_c = (margin, catch, miss)
+        if best_c:
+            lines.append(f"    → 推奨: 差 {best_c[0]:.2f}"
+                         f"（取りこぼし {best_c[2]:.1f}% / 単調を {best_c[1]:.1f}% 弾ける）")
+        else:
+            lines.append("    → 取りこぼし3%以下で使える設定なし")
 
     report = "\n".join(lines)
     print(report)
