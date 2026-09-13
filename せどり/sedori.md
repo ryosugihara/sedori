@@ -48,7 +48,7 @@ GitHubリポジトリ: https://github.com/ryosugihara/sedori （作業ブラン�
 | `scan-profit.yml` 在庫スキャン | 監視中の全ブランドの「今ある出品」から利益商品を探す棚卸し | 毎日 12:30 |
 | `mercari-priority-scan.yml` メルカリ優先スキャン | 出品直後に競争になるブランドだけを高頻度で見張るループ | 6時間ごと（ループ） |
 | `collect-souba.yml` 相場DB収集 | メルカリの売り切れ実例を集めて相場DBに追加 | 毎月1日・15日 12:00 |
-| `upgrade-embeddings.yml` 指紋アップグレード | 相場DBの指紋を新方式（背景切り抜き＋SigLIP＋DINOv2-large）で作り直す。全件終わるまで繰り返す | 3時間ごと |
+| `upgrade-embeddings.yml` 指紋アップグレード | 相場DBの指紋を新方式（背景切り抜き＋SigLIP＋DINOv2-large）で作り直す。全件終わるまで繰り返す。写真が消えた商品など**3回続けて失敗した物は諦めて対象から外し**、理由を `recon/UPGRADE_EMBEDDINGS.txt` とDiscordに残す。DBを書き換えなかった回は相場DBを保存し直さない | 3時間ごと |
 | `purchase-log.yml` 購入・売却の記録 | 買った・売れたを記録し、集計レポートをDiscordへ | 毎週月曜 09:00 |
 
 手動専用（Actionsタブから Run workflow）:
