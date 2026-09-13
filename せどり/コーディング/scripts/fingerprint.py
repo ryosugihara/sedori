@@ -167,6 +167,15 @@ def get_rembg():
     return _rembg_session
 
 
+# 背景切り抜きの結果がこれより小さければ『切り抜き失敗』とみなし、元画像を使う。
+# （小さくすると切り抜きを信用しやすくなるが、細い切れ端でAIが計算できない事故が増える）
+MIN_CROP_PX = 32       # 切り抜いた画像の幅・高さの最小値（ピクセル）
+MIN_CROP_RATIO = 0.05  # 切り抜いた画像の面積が、元画像の何割以上あれば信用するか
+
+# 直前の新方式の指紋化で起きたエラーの内容（指紋づくりの記録に理由として残すため）
+LAST_V2_ERROR = None
+
+
 def remove_bg_and_crop(raw, margin=0.06):
     """背景を消して『商品だけ』を白背景で切り抜いたPIL画像(RGB)を返す。
     背景・ハンガー・マネキン・余白を除くことで、指紋が商品そのものに集中する
@@ -188,6 +197,14 @@ def remove_bg_and_crop(raw, margin=0.06):
         mx, my = int((xs.max() - xs.min()) * margin), int((ys.max() - ys.min()) * margin)
         x0, y0 = max(0, xs.min() - mx), max(0, ys.min() - my)
         x1, y1 = min(w, xs.max() + mx), min(h, ys.max() + my)
+        # 切り抜きが小さすぎる時は元画像を使う。
+        # 白い服を白っぽい背景で撮った写真などは、商品と背景の境目が分からず
+        # 『ほぼ全部が背景』と判定されて、細い切れ端しか残らないことがある。
+        # 幅や高さが0に近い画像は、指紋を作るAIが計算できずにエラーになり、
+        # その商品だけ何度やっても指紋が作れなかった（2026-09-13 実例: 白いシャツ）。
+        cw, ch = x1 - x0, y1 - y0
+        if cw < MIN_CROP_PX or ch < MIN_CROP_PX or cw * ch < w * h * MIN_CROP_RATIO:
+            return Image.open(io.BytesIO(raw)).convert("RGB")
         white = Image.new("RGBA", cut.size, (255, 255, 255, 255))
         comp = Image.alpha_composite(white, cut).convert("RGB")  # 背景を白に
         return comp.crop((x0, y0, x1, y1))
@@ -236,14 +253,28 @@ def embed_dino_large(img):
 def embed_bytes_v2(raw):
     """画像データ(バイト列)を新方式で (SigLIP指紋, DINOv2-large指紋) にする。
     背景切り抜き→2つのAIで指紋化。失敗したら (None, None)。
+    切り抜いた画像で計算できなかった時は、切り抜く前の元画像でもう一度試す
+    （切り抜きが原因で指紋が作れない商品を救うため）。
     """
+    global LAST_V2_ERROR
+    LAST_V2_ERROR = None
+    import io
+    from PIL import Image
     img = remove_bg_and_crop(raw)
     if img is None:
+        LAST_V2_ERROR = "画像を開けなかった"
         return None, None
     try:
         return embed_siglip(img), embed_dino_large(img)
     except Exception as e:
-        print(f"  新方式の指紋化に失敗: {e}")
+        first = f"{type(e).__name__}: {str(e)[:80]}（切り抜き後{img.size[0]}x{img.size[1]}）"
+        print(f"  切り抜いた画像で指紋化に失敗、元画像で再挑戦: {first}")
+    try:
+        orig = Image.open(io.BytesIO(raw)).convert("RGB")
+        return embed_siglip(orig), embed_dino_large(orig)
+    except Exception as e:
+        LAST_V2_ERROR = f"{first} → 元画像でも失敗 {type(e).__name__}: {str(e)[:80]}"
+        print(f"  新方式の指紋化に失敗: {LAST_V2_ERROR}")
         return None, None
 
 

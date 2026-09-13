@@ -157,7 +157,9 @@ def main():
                 # 安全弁: 指紋は本来1本(数千バイト)。異常に大きい物は保存しない
                 # （SigLIPが系列[729,1152]=1.6MBを返してDBを19GBに膨張させた事故の再発防止）。
                 if v3 is None or v4 is None:
-                    reason = "AIの指紋化に失敗（画像は読めたが計算できなかった）"
+                    detail = getattr(fingerprint, "LAST_V2_ERROR", None)
+                    reason = ("AIの指紋化に失敗（画像は読めたが計算できなかった）"
+                              + (f" 詳細: {detail}" if detail else ""))
                 elif v3.size > 4096 or v4.size > 4096:
                     reason = f"指紋の大きさが異常（{v3.size}/{v4.size}）"
                 else:
