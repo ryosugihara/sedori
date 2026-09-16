@@ -16,6 +16,17 @@
       ]
     },
     {
+      "name": "GUCCI",
+      "keyword": "GUCCI"
+    },
+    {
+      "name": "CELINE",
+      "keyword": "CELINE"
+    }
+  ],
+  "_停止中のブランドの説明": "2026-09-16 に監視を4ブランド（GUCCI・CELINE・Undercover・Saint Laurent）へ集中させたため、それ以外のブランドをここに移して止めている（プログラムは brands だけを読むので、ここは無視される）。戻す時は、戻したいブランドをここから brands に移す。※新着監視のサイトは、長く止めていたブランドを戻すと、その間に入荷した在庫がまとめて『新着』として通知される可能性がある。戻す時は作業担当に相談すること",
+  "_停止中のブランド": [
+    {
       "name": "Dior Homme",
       "keyword": "DIOR HOMME",
       "profit_only": true
@@ -43,11 +54,6 @@
     {
       "name": "JUNYA WATANABE COMME des GARCONS",
       "keyword": "JUNYA WATANABE",
-      "profit_only": true
-    },
-    {
-      "name": "GUCCI",
-      "keyword": "GUCCI",
       "profit_only": true
     },
     {
@@ -101,11 +107,6 @@
       "profit_only": true
     },
     {
-      "name": "CELINE",
-      "keyword": "CELINE",
-      "profit_only": true
-    },
-    {
       "name": "LANVIN",
       "keyword": "LANVIN",
       "profit_only": true
@@ -125,7 +126,21 @@
       "keyword": "バレンシアガ",
       "profit_only": true,
       "fast": true,
-      "only_keywords": ["バッグ", "バック", "かばん", "カバン", "bag", "ショルダーバッグ", "トートバッグ", "ハンドバッグ", "ボストンバッグ", "クラッチ", "ポーチ", "トート", "ショルダー"]
+      "only_keywords": [
+        "バッグ",
+        "バック",
+        "かばん",
+        "カバン",
+        "bag",
+        "ショルダーバッグ",
+        "トートバッグ",
+        "ハンドバッグ",
+        "ボストンバッグ",
+        "クラッチ",
+        "ポーチ",
+        "トート",
+        "ショルダー"
+      ]
     }
   ]
 }

@@ -40,8 +40,8 @@ WATCH_MERCARI_FILE = "せどり/データ/watchlists/watch_mercari.json"
 
 def load_all_brand_targets():
     """既定の対象：相場収集リスト(watch_mercari.json)の全ブランド・全キーワード。
-    以前は③ブランドだけの手打ちリストだったが、監視中の全ブランド(23種・
-    キーワード計90件超)を対象にすることでスキャンの網羅性を上げる。
+    どのブランドを見るかは watch_mercari.json の brands で決める
+    （2026-09-16 から GUCCI・CELINE・Undercover・Saint Laurent の4ブランドに集中）。
     """
     data = monitor.load_json_file(WATCH_MERCARI_FILE, {"brands": []})
     out = [(b.get("name", ""), kw)
@@ -69,20 +69,22 @@ MAX_SENT = int(os.environ.get("SCAN_MAX", "20"))  # 通知しすぎ防止の上�
 
 # ===== 優先スキャン(高頻度ループ) =====================================
 # メルカリは個人間売買のため、良い出品はすぐ他の買い手に取られてしまう。
-# 通常のスキャン(1日1回・全107キーワード)では間に合わないブランドだけ、
+# 通常のスキャン(1日1回)では間に合わないブランドだけ、
 # KINDAL新着監視と同じ「短い間隔でループし続ける」方式で見張る。
-# 対象は watch_mercari.json 内の該当ブランドのキーワードをそのまま使う
-# （増やしたい時はここにブランド名を足すだけでよい）。
-PRIORITY_BRANDS = ["Balenciaga", "Saint Laurent"]
+# 対象は watch_mercari.json 内の該当ブランドのキーワードをそのまま使う。
+# どのブランドを見るかは watch_mercari.json の『優先スキャンのブランド』で決める
+# （書いていない時だけ、下の PRIORITY_BRANDS を使う）。
+PRIORITY_BRANDS = ["Saint Laurent"]
 PRIORITY_SEEN_FILE = SEEN_FILE  # 通常スキャンと同じ記録を共有（二重通知防止）
 
 
 def load_priority_targets():
     data = monitor.load_json_file(WATCH_MERCARI_FILE, {"brands": []})
+    brands = data.get("優先スキャンのブランド") or PRIORITY_BRANDS
     return [(b.get("name", ""), kw)
             for b in data.get("brands", [])
             for kw in b.get("keywords", [])
-            if b.get("name") in PRIORITY_BRANDS]
+            if b.get("name") in brands]
 
 
 def try_match_and_send(raw, brand, souba, excludes, notified_before, stats, tag=""):
