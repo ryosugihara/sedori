@@ -3,22 +3,22 @@
 
 【物差しごとの件数】
   対象外ブランド: 85666件
-  服以外(名前): 16432件
-  服以外(写真): 1487件
-  単色すぎる服: 426件
+  服以外(名前): 16352件
+  服以外(写真): 1515件
+  単色すぎる服: 265件
 
 【ブランド別】残る件数 / 全件数（上位20）
      PRADA: 0 / 11830
      COACH: 0 / 10963
-  ★ GUCCI: 2294 / 10452
-  ★ Saint Laurent: 5144 / 8440
-  ★ CELINE: 592 / 7188
+  ★ GUCCI: 2338 / 10452
+  ★ Saint Laurent: 5256 / 8440
+  ★ CELINE: 597 / 7188
      Rick Owens: 0 / 6585
      Ralph Lauren: 0 / 6532
      Hysteric Glamour: 0 / 6147
      NUMBER (N)INE: 0 / 5354
      adidas: 0 / 5103
-  ★ Undercover: 4565 / 4860
+  ★ Undercover: 4617 / 4860
      EMPORIO ARMANI: 0 / 4605
      Versace: 0 / 4532
      MIU MIU: 0 / 4323
@@ -31,13 +31,13 @@
 
 【服以外(名前) の例】
   ・Saint Laurent / サンローラン YSLロゴヒール エナメルブーツ 黒
-  ・Saint Laurent / Saint Laurent Paris baggy Pants 2024モデル
   ・Saint Laurent / 【美品】SAINT LAURENT PARIS "パテントレザーヒールブーツ"
   ・Saint Laurent / ヴィンテージ YSL イヴサンローラン ロゴエンボス サンダル 黒 27〜28
   ・Saint Laurent / SAINT LAURENT PARIS クラシック ワイアット ハーネスブーツ
   ・Saint Laurent / Saint Laurent Paris エディ期 フラワーブーケブローチ
   ・Saint Laurent / 【美品】SAINT LAURENT PARIS "VASSILI"ヒールブーツ
-  ・Saint Laurent / サンローラン ダメージ加工 スキニーデニムパンツ 33 ケリングタグ着き 日本製
+  ・Saint Laurent / 20SS エディ期 CELINE ジャクノ ドレスシューズ　39
+  ・Saint Laurent / YEEZY SEASON 5 コンバットブーツ
 
 【服以外(写真) の例】
   ・Saint Laurent / 【激レア】 Saint Laurent ウエスタンヒール　WA552601 43
@@ -60,14 +60,24 @@
   ・Dior Homme / フォトプリントVネックT ラフシモンズ系 semantic系
 
 【単色すぎる服 の例】
+  ・0.78 / Saint Laurent Paris baggy Pants 2024モデル
+  ・0.55 / イブサンローラン　ホワイト長袖シャツ
+  ・0.86 / b*k様 SAINT LAURENT ミリタリーシャツ エディ期 y2k arc
+  ・0.53 / イヴ・サンローラン YSL デニムパンツ
+  ・0.72 / に*ん様 Yves Saint Laurent ポロシャツ イタリア製 ワンポイ
+  ・0.90 / SAINT LAURENT PARIS♦フランス製 パームツリー Tシャツ XL
+  ・0.58 / Saint Laurent ロゴ Tシャツ ブラック 箱付き
+  ・0.63 / サンローラン☆センターロゴTシャツ YSL M
+
+【単色だが名前で残した の例】
   ・0.94 / 激レア Old Yves saint lauren イヴサンローラン ストライプ
   ・0.52 / コンチョ装飾 ブラックスキニーデニムパンツ エディ期
   ・0.60 / ポ*ロ様 【希少エディ期】サンローラン・デニムシャツ　S
   ・0.58 / 美品 希少 イヴサンローラン フリル カットソー ヴィンテージ グリーン M
   ・0.63 / ダ*ケ様 希少 Levi's リーバイス デニム 503B-XX W30 L34
-  ・0.55 / イブサンローラン　ホワイト長袖シャツ
   ・0.80 / BORDER POLO SHIRT ARCHIVE
   ・0.56 / 希少saint laurent バイカーデニム 26
+  ・0.50 / 00s archive japanese label skinny denim
 
 【単色度の分布（1.0に近いほど1色）】
   下から10%: 0.22
@@ -76,8 +86,8 @@
   下から75%: 0.53
   下から90%: 0.67
   しきい値0.3 なら 1094件 (73%) が単色扱い
-  しきい値0.4 なら 716件 (48%) が単色扱い
-  しきい値0.5 なら 426件 (28%) が単色扱い
+  しきい値0.4 なら 715件 (48%) が単色扱い
+  しきい値0.5 なら 425件 (28%) が単色扱い
   しきい値0.6 なら 255件 (17%) が単色扱い
   しきい値0.7 なら 121件 (8%) が単色扱い
 
