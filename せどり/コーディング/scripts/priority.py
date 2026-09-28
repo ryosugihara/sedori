@@ -29,6 +29,7 @@
 ※設定が読めない・壊れている場合は全部スコア0（＝今まで通りの順番）で動く。
 """
 
+import re
 import json
 import datetime
 
@@ -64,10 +65,42 @@ def current_season(today=None):
     return season, _PREV[season]
 
 
-def _has(text, words):
-    """文章に、言葉のリストのどれかが含まれるか"""
+def _clean(text):
+    """言葉さがしの前に、まぎらわしい言い回しを文章から取り除く。
+
+    日本語は単語の区切りが無いため、短い言葉は別の言葉の一部に偶然一致してしまう。
+    実例（2026-09-29に発見。本物の商品が『服以外』として除外されていた）:
+      ・「ケリングタグ」の“リング”が指輪と一致 …… ケリングはサンローラン等の親会社名で、
+        正規品のタグによく書かれている＝正規品ほど誤って除外されていた
+      ・「スプリングコート」の“リング”も同じ
+      ・「baggy Pants」の“bag”がバッグと一致
+    まぎらわしい言い回しは priority.json の『まぎらわしい言葉』で足せる。
+    """
     t = (text or "").lower()
-    return any(w.lower() in t for w in words if w)
+    try:
+        for phrase in _conf().get("まぎらわしい言葉", []):
+            t = t.replace(phrase.lower(), " ")
+    except Exception:
+        pass
+    return t
+
+
+def _has(text, words):
+    """文章に、言葉のリストのどれかが含まれるか。
+    英数字だけの言葉（bag など）は、単語として現れた時だけ一致させる
+    （baggy の中の bag には反応しない）。
+    """
+    t = _clean(text)
+    for w in words:
+        if not w:
+            continue
+        w = w.lower()
+        if w.isascii():
+            if re.search(r"(?<![a-z0-9])" + re.escape(w) + r"(?![a-z0-9])", t):
+                return True
+        elif w in t:
+            return True
+    return False
 
 
 def is_non_clothing(text):

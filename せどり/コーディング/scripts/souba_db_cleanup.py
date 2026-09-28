@@ -170,12 +170,24 @@ def main():
         targets = plain_candidates if COLOR_LIMIT < 0 else plain_candidates[:COLOR_LIMIT]
         print(f"単色度を調べる対象: {len(targets)}件（写真を取得して色の内訳を数える）")
         color_ratios = measure_colors([(i, u) for i, _n, u in targets])
+        kept_by_name = 0
         for iid, name, url in targets:
             r = color_ratios.get(iid)
-            if r is not None and r >= PLAIN_RATIO:
-                tag[iid] = "単色すぎる服"
-                counts["単色すぎる服"] = counts.get("単色すぎる服", 0) + 1
-                examples.setdefault("単色すぎる服", []).append(f"{r:.2f} / {name}")
+            if r is None or r < PLAIN_RATIO:
+                continue
+            # 色が単色寄りでも、商品名に『柄・装飾』や『希少さ』を示す言葉があれば残す。
+            # 縞模様や希少なヴィンテージは、写真の色だけ見ると1色に寄って見えるため
+            # （下見で「ストライプ」「BORDER POLO」「Levi's 503B-XX」が単色と判定された）
+            if priority.is_flashy(name) or priority._has(
+                    name, priority._conf().get("価値ワード", [])):
+                kept_by_name += 1
+                examples.setdefault("単色だが名前で残した", []).append(f"{r:.2f} / {name}")
+                continue
+            tag[iid] = "単色すぎる服"
+            counts["単色すぎる服"] = counts.get("単色すぎる服", 0) + 1
+            examples.setdefault("単色すぎる服", []).append(f"{r:.2f} / {name}")
+        if kept_by_name:
+            print(f"  単色寄りだが柄・希少さの言葉があるため残した: {kept_by_name}件")
 
     # --- 報告 -----------------------------------------------------------
     lines = [f"🧹 相場DBの大掃除（{'下見（消しません）' if MODE != 'delete' else '実行'}）",
