@@ -26,6 +26,13 @@ import mercari      # メルカリ検索の部品
 import fingerprint  # 画像の指紋化の部品
 import souba_clean  # 相場に使わない実例（まとめ売り・ジャンク等）を弾く部品
 
+# 服以外・単色すぎる服を見本帳に入れないための部品。
+# 読み込めなくても収集は動く（その場合は今まで通り全部入れる）
+try:
+    import priority
+except Exception:
+    priority = None
+
 DB_FILE = "せどり/データ/data/souba_db.sqlite"
 CONF_FILE = "せどり/データ/watchlists/watch_mercari.json"
 REQUEST_WAIT = 1.5   # メルカリ検索の間隔（秒）
@@ -176,6 +183,7 @@ def main():
     added = 0
     no_image = 0
     per_brand = {}
+    picture_skipped = {}  # 写真を見て入れなかった件数（理由ごと）
 
     for b in brands:
         for kw in b.get("keywords", []):
@@ -207,14 +215,29 @@ def main():
             for it in fresh:
                 vec, vec2 = None, None
                 if it.get("image"):
-                    # 1回のダウンロードで2種類の指紋(CLIP+DINO)を作る
-                    v, v2 = fingerprint.embed_image_url_both(it["image"])
+                    # 写真を1回だけ取ってきて、判定にも指紋づくりにも使い回す
+                    raw = fingerprint.download_bytes(it["image"])
+                    time.sleep(IMG_WAIT)
+                    if raw is None:
+                        no_image += 1
+                        continue
+                    v = fingerprint.embed_image_bytes(raw)        # CLIPの指紋
+                    # 写真を見て『服以外（バッグ・靴・小物）』なら見本帳に入れない。
+                    # 「グッチ」のような広い検索語ではバッグも出てくるため
+                    if v is not None and priority is not None and priority.skip_by_image(v):
+                        picture_skipped["服以外"] = picture_skipped.get("服以外", 0) + 1
+                        continue
+                    # 写真の色を数えて『1色がほとんどを占める服』も入れない
+                    # （無地の黒Tシャツ等。写真では見分けがつかず利益も出にくい）
+                    if priority is not None and priority.is_single_color(raw, it.get("name", "")):
+                        picture_skipped["単色"] = picture_skipped.get("単色", 0) + 1
+                        continue
+                    v2 = fingerprint.embed_image_bytes_dino(raw)  # DINOの指紋
                     if v is not None:
                         # float16にして半分のサイズで保存（精度はほぼ変わらない）
                         vec = v.astype("float16").tobytes()
                     if v2 is not None:
                         vec2 = v2.astype("float16").tobytes()
-                    time.sleep(IMG_WAIT)
                 if vec is None:
                     no_image += 1
                 con.execute(
@@ -264,9 +287,15 @@ def main():
     with_vec = con.execute("SELECT COUNT(*) FROM items WHERE vec IS NOT NULL").fetchone()[0]
     con.close()
 
+    skip_line = ("　写真を見て入れなかった: "
+              + "、".join(f"{k}{v}件" for k, v in picture_skipped.items())
+              if picture_skipped else "")
     lines = [f"📚 メルカリ相場DBを更新しました（{now}）",
              f"　新しく追加: {added} 件（うち指紋化できず: {no_image}）",
-             f"　DB合計: {total} 件（画像指紋あり {with_vec} 件）", ""]
+             f"　DB合計: {total} 件（画像指紋あり {with_vec} 件）"]
+    if skip_line:
+        lines.append(skip_line)
+    lines.append("")
     for name, n in sorted(per_brand.items(), key=lambda x: -x[1]):
         lines.append(f"　・{name}: +{n}")
     report = "\n".join(lines)

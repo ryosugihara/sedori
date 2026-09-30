@@ -318,6 +318,48 @@ def skip_by_pattern(vec_clip):
         return None
 
 
+def single_color_ratio(raw):
+    """写真の『一番多い色が占める割合』を返す（1.0に近いほど1色）。測れなければ None。
+
+    geom_verify.color_hist は写真の中心70%だけを見て、色あい・鮮やかさ・明るさの
+    マス目ごとに画素を数えた物。その中で一番大きいマスの割合を見れば、
+    『ほぼ1色の服』か『いろいろな色が入った服』かが分かる。
+    （柄の有無をAIに当てさせる方法は精度不足で不採用にしたが、
+      こちらは色を直接数えるので判断がぶれにくい）
+    """
+    try:
+        import geom_verify
+        h = geom_verify.color_hist(raw)
+        if h is None:
+            return None
+        total = float(h.sum())
+        if total <= 0:
+            return None
+        return float(h.max()) / total
+    except Exception:
+        return None
+
+
+def is_single_color(raw, name=""):
+    """写真が『単色すぎる服』か。集めない/消す対象なら True。
+
+    商品名に柄・装飾の言葉や希少さを示す言葉があれば、色が1色寄りでも残す
+    （縞模様や希少なヴィンテージは、写真の色だけ見ると1色に寄って見えるため）。
+    """
+    try:
+        s = _conf()
+        if not s.get("単色_集めない", False):
+            return False
+        if is_flashy(name) or _has(name, s.get("価値ワード", [])):
+            return False
+        r = single_color_ratio(raw)
+        if r is None:
+            return False
+        return r >= float(s.get("単色_しきい値", 0.7))
+    except Exception:
+        return False
+
+
 def skip_by_image(vec_clip):
     """写真を見て『服以外』と判断できたら理由を返す。服（または自信が無い）なら None。
     服以外のグループが服を『服以外と判断する差』以上 上回った時だけ弾く

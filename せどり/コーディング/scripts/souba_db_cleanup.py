@@ -83,16 +83,8 @@ def single_color_ratio(raw):
     （柄の有無をAIに当てさせる方法は精度不足で不採用にしたが、
       こちらは色を直接数えるので判断がぶれにくい）
     """
-    try:
-        h = geom_verify.color_hist(raw)
-        if h is None:
-            return None
-        total = float(h.sum())
-        if total <= 0:
-            return None
-        return float(h.max()) / total
-    except Exception:
-        return None
+    # 収集時の判定（priority.is_single_color）と同じ物差しを使う
+    return priority.single_color_ratio(raw)
 
 
 def fetch_bytes(url):
