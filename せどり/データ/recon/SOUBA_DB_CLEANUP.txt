@@ -1,73 +1,17 @@
-🧹 相場DBの大掃除（実行）
-  全116606件
+🧹 相場DBの大掃除（下見（消しません））
+  全12398件
 
 【物差しごとの件数】
-  対象外ブランド: 85666件
-  服以外(名前): 16352件
-  服以外(写真): 1515件
-  単色すぎる服: 675件
+  対象外ブランド: 0件
+  服以外(名前): 0件
+  服以外(写真): 0件
+  単色すぎる服: 1件
 
 【ブランド別】残る件数 / 全件数（上位20）
-     PRADA: 0 / 11830
-     COACH: 0 / 10963
-  ★ GUCCI: 2252 / 10452
-  ★ Saint Laurent: 5095 / 8440
-  ★ CELINE: 579 / 7188
-     Rick Owens: 0 / 6585
-     Ralph Lauren: 0 / 6532
-     Hysteric Glamour: 0 / 6147
-     NUMBER (N)INE: 0 / 5354
-     adidas: 0 / 5103
-  ★ Undercover: 4472 / 4860
-     EMPORIO ARMANI: 0 / 4605
-     Versace: 0 / 4532
-     MIU MIU: 0 / 4323
-     Givenchy: 0 / 3827
-     Dior Homme: 0 / 3400
-     DIESEL: 0 / 3018
-     COMME des GARCONS SHIRT: 0 / 2769
-     Balenciaga: 0 / 1874
-     JUNYA WATANABE COMME des GARCONS: 0 / 1286
-
-【服以外(名前) の例】
-  ・Saint Laurent / サンローラン YSLロゴヒール エナメルブーツ 黒
-  ・Saint Laurent / 【美品】SAINT LAURENT PARIS "パテントレザーヒールブーツ"
-  ・Saint Laurent / ヴィンテージ YSL イヴサンローラン ロゴエンボス サンダル 黒 27〜28
-  ・Saint Laurent / SAINT LAURENT PARIS クラシック ワイアット ハーネスブーツ
-  ・Saint Laurent / Saint Laurent Paris エディ期 フラワーブーケブローチ
-  ・Saint Laurent / 【美品】SAINT LAURENT PARIS "VASSILI"ヒールブーツ
-  ・Saint Laurent / 20SS エディ期 CELINE ジャクノ ドレスシューズ　39
-  ・Saint Laurent / YEEZY SEASON 5 コンバットブーツ
-
-【服以外(写真) の例】
-  ・Saint Laurent / 【激レア】 Saint Laurent ウエスタンヒール　WA552601 43
-  ・Saint Laurent / SAINT LAURENT Gourmette Cuff
-  ・Saint Laurent / 【稼働・精度確認済】Yves Saint Laurent 4-851447YO
-  ・Saint Laurent / 石*司様 【遺品・生前整理品】YSL、GIVENCHYsilver925、NR他
-  ・Saint Laurent / ア*ト様 ◆稼働◆ YSL 4620-E60957 Y ブルー クオーツ ユニセ
-  ・Saint Laurent / 稼働 イヴサンローラン クォーツ コンビカラー ゴールドベゼル 状態考慮
-  ・Saint Laurent / YveSaintLaurent rive gauche leather belt
-  ・Undercover / G*L様 Supreme COMME des GARÇONS SHIRT Van
-
-【対象外ブランド の例】
-  ・Dior Homme / Dior Homme AW04 VOTC Striped tシャツ
-  ・Dior Homme / 極美品】Dior Homme/ディオールオム　Tシャツ　BEE刺繍　春夏　XXL
-  ・Dior Homme / DIOR ローズ刺繍 Tシャツ ブラック
-  ・Dior Homme / Dior Vネック Tシャツ ビー刺繍 グレー
-  ・Dior Homme / Dior homme エディ期　ジオメトリックグラフィックTシャツ
-  ・Dior Homme / ディオール×ステューシー コラボ 刺繍ロゴ 即完売 半袖カットソー Tシャツ
-  ・Dior Homme / Dior Homme ディオールオム Ｔシャツ グレー ペイント ペンキ XXS
-  ・Dior Homme / フォトプリントVネックT ラフシモンズ系 semantic系
-
-【単色すぎる服 の例】
-  ・0.78 / Saint Laurent Paris baggy Pants 2024モデル
-  ・0.86 / b*k様 SAINT LAURENT ミリタリーシャツ エディ期 y2k arc
-  ・0.72 / に*ん様 Yves Saint Laurent ポロシャツ イタリア製 ワンポイ
-  ・0.90 / SAINT LAURENT PARIS♦フランス製 パームツリー Tシャツ XL
-  ・0.71 / Y's ヨウジヤマモト　 Tシャツ
-  ・0.87 / ☆《イブサンローラン》Yves Saint Laurent イエロー TシャツM
-  ・0.82 / SAINT LAURENT Tシャツ
-  ・0.81 / SAINT LAURENT PARIS T-shirt Hedi
+  ★ Saint Laurent: 5094 / 5095
+  ★ Undercover: 4472 / 4472
+  ★ GUCCI: 2252 / 2252
+  ★ CELINE: 579 / 579
 
 【単色だが名前で残した の例】
   ・0.94 / 激レア Old Yves saint lauren イヴサンローラン ストライプ
@@ -79,16 +23,19 @@
   ・0.84 / イヴサンローラン 金ボタン カーディガン M 青 YSLロゴ刺繍 福助 古着
   ・0.90 / Yves Saint Laurent ヴィンテージ ロングニット 長袖 L
 
-【単色度の分布（1.0に近いほど1色）】
-  下から10%: 0.21
-  下から25%: 0.28
-  下から50%: 0.39
-  下から75%: 0.52
-  下から90%: 0.67
-  しきい値0.3 なら 9298件 (71%) が単色扱い
-  しきい値0.4 なら 6241件 (48%) が単色扱い
-  しきい値0.5 なら 3712件 (28%) が単色扱い
-  しきい値0.6 なら 2136件 (16%) が単色扱い
-  しきい値0.7 なら 1072件 (8%) が単色扱い
+【単色すぎる服 の例】
+  ・0.82 / ア*ズ様 イブサンローラン Tシャツ
 
-🗑️ 104208件を削除しました（残り 12398件）
+【単色度の分布（1.0に近いほど1色）】
+  下から10%: 0.22
+  下から25%: 0.29
+  下から50%: 0.38
+  下から75%: 0.50
+  下から90%: 0.62
+  しきい値0.3 なら 1076件 (72%) が単色扱い
+  しきい値0.4 なら 680件 (45%) が単色扱い
+  しきい値0.5 なら 375件 (25%) が単色扱い
+  しきい値0.6 なら 188件 (13%) が単色扱い
+  しきい値0.7 なら 50件 (3%) が単色扱い
+
+※下見モードのため、DBは一切変更していません
