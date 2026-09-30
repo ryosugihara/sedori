@@ -88,12 +88,14 @@ jobs:
       - name: 大掃除（既定は下見）
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-          CLEANUP_MODE: ${{ github.event.inputs.mode || 'dry' }}
-          COLOR_LIMIT: ${{ github.event.inputs.color_limit || '1500' }}
-          PLAIN_RATIO: ${{ github.event.inputs.plain_ratio || '0.5' }}
-          DEL_NON_CLOTHING: ${{ github.event.inputs.del_non_clothing || '0' }}
-          DEL_PLAIN: ${{ github.event.inputs.del_plain || '0' }}
-          DEL_OTHER_BRANDS: ${{ github.event.inputs.del_other_brands || '0' }}
+          # ⚠️ 2026-09-30: 承認を得た一回限りの削除のため、既定を delete にしている。
+          # この回が終わったら既定を dry（下見）に戻すこと
+          CLEANUP_MODE: ${{ github.event.inputs.mode || 'delete' }}
+          COLOR_LIMIT: ${{ github.event.inputs.color_limit || '-1' }}
+          PLAIN_RATIO: ${{ github.event.inputs.plain_ratio || '0.7' }}
+          DEL_NON_CLOTHING: ${{ github.event.inputs.del_non_clothing || '1' }}
+          DEL_PLAIN: ${{ github.event.inputs.del_plain || '1' }}
+          DEL_OTHER_BRANDS: ${{ github.event.inputs.del_other_brands || '1' }}
         run: python せどり/コーディング/scripts/souba_db_cleanup.py
 
       - name: 相場DBをReleaseに保存（実際に消した時だけ）
