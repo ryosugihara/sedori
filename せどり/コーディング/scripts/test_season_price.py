@@ -18,7 +18,8 @@
        もし通年物にも同じだけ差が出るなら、その差は季節のせいではなく
        『比べている商品が違うだけ』なので、対策しても意味がないと分かる
 
-メルカリには一切アクセスしない。重いAIも使わない（手元のDBを数えるだけ）。
+メルカリには一切アクセスしない。重いAI(torch等)も使わない。
+方法2では保存済みの写真の指紋を使うので numpy だけ必要。
 結果は recon/SEASON_PRICE.txt に保存し、Discordにも送る。
 """
 
@@ -129,7 +130,9 @@ def main():
         lines.append("")
 
     # 判定
-    lines.append("【結論の目安】")
+    lines.append("【方法1の結論の目安】")
+    lines.append("  ※対照群(通年物)が1.0から大きく外れている時は、比べている商品が")
+    lines.append("　　違うだけなので、方法1の数字は信用できない")
     w = by_label.get("冬物", [])
     s = by_label.get("夏物", [])
     c = by_label.get("通年物(対照群)", [])
@@ -153,6 +156,72 @@ def main():
             else:
                 lines.append(f"  {label}: 対照群との差は {diff:+.0f}ポイント"
                              " → 季節の影響は小さい。対策しても効果は薄い")
+
+    # ========== 方法2: 同じ商品どうしで比べる（こちらが本命）==========
+    # 方法1は『比べている商品が違う』ことに弱い。実際、季節に関係ないはずの
+    # 通年物にも大きな差が出てしまった（相場DBは最近売れた物ほど多く集まるため、
+    # 『シーズン中＝古いデータ / シーズン外＝新しいデータ』になっていた）。
+    # そこで写真の指紋で『同じ商品』の組を見つけ、その組の中だけで
+    # 『シーズン中に売れた値段』と『シーズン外に売れた値段』を比べる。
+    lines.append("")
+    lines.append("=" * 58)
+    lines.append("【方法2: 同じ商品どうしで比べる】")
+    lines.append("  写真の指紋がそっくりな組だけを使うので、商品の違いに影響されない")
+    try:
+        import numpy as np
+        con = sqlite3.connect(DB_FILE)
+        rows2 = con.execute(
+            "SELECT name, price, brand, updated, vec, vec2 FROM items "
+            "WHERE price > 0 AND updated IS NOT NULL AND vec IS NOT NULL AND vec2 IS NOT NULL"
+        ).fetchall()
+        con.close()
+
+        def unit(b):
+            v = np.frombuffer(b, dtype=np.float16).astype("float32")
+            n = np.linalg.norm(v)
+            return None if n == 0 else v / n
+
+        # ブランド×種類ごとに、同じ商品の組を探す
+        buckets = {}
+        for name, price, brand, updated, vec, vec2 in rows2:
+            label, months = category_of(name)
+            if not label:
+                continue
+            a, b = unit(vec), unit(vec2)
+            if a is None or b is None:
+                continue
+            month = datetime.datetime.fromtimestamp(updated).month
+            buckets.setdefault((brand or "(不明)", label), []).append(
+                (int(price), month in months, a, b, name))
+
+        for label, _w, _m in CATEGORIES:
+            ratios, pairs = [], 0
+            for (brand, lb), items in buckets.items():
+                if lb != label or len(items) < 2:
+                    continue
+                mat_c = np.stack([x[2] for x in items])
+                mat_d = np.stack([x[3] for x in items])
+                sims_c = mat_c @ mat_c.T
+                sims_d = mat_d @ mat_d.T
+                n = len(items)
+                for i in range(n):
+                    if not items[i][1]:
+                        continue  # iはシーズン中の物だけ
+                    for j in range(n):
+                        if items[j][1] or i == j:
+                            continue  # jはシーズン外の物だけ
+                        # 『同デザイン』の合格ラインより厳しめ＝ほぼ同じ商品
+                        if sims_c[i, j] >= 0.90 and sims_d[i, j] >= 0.88:
+                            ratios.append(items[j][0] / items[i][0])
+                            pairs += 1
+            if len(ratios) >= 10:
+                med = statistics.median(ratios)
+                lines.append(f"  {label}: 同じ商品の組 {pairs}組 → "
+                             f"シーズン外は {(med - 1) * 100:+.0f}% の値段（比 {med:.2f}）")
+            else:
+                lines.append(f"  {label}: 同じ商品の組が{len(ratios)}組しか無く、測れません")
+    except Exception as e:
+        lines.append(f"  測定に失敗しました: {type(e).__name__}: {str(e)[:80]}")
 
     report = "\n".join(lines)
     print(report)

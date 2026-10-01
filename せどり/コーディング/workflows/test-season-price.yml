@@ -47,6 +47,9 @@ jobs:
             exit 1
           fi
 
+      - name: 必要な道具を入れる（写真の指紋を比べるため）
+        run: pip install --quiet numpy
+
       - name: 測定を実行
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
