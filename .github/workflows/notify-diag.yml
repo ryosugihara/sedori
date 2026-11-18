@@ -46,6 +46,7 @@ jobs:
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DIAG_SEND: "1" # 『通知されるはず』の1件を実際に送って、Discordの返事を記録する
         run: python せどり/コーディング/scripts/notify_diag.py
 
       - name: 結果を保存

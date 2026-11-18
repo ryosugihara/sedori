@@ -80,6 +80,7 @@ def main():
 
     funnel = collections.Counter()
     rows = []
+    should_send = []  # 『通知されるはず』の商品（送信テスト用）
     for b in brands:
         key = b.get("collection") or b.get("keyword")
         try:
@@ -124,8 +125,39 @@ def main():
                         reason = "派手語なし・利益不足"
                     else:
                         reason = "★通知されるはず"
+                        if match:
+                            it["img_match"] = match
+                        should_send.append(it)
             funnel[reason] += 1
             rows.append(f"[{reason}] {t[:50]} [{c}] {it.get('price')} {extra} {it.get('url')}")
+
+    # 送信テスト（DIAG_SEND=1 の時だけ）: 『通知されるはず』の1件を、本番と同じ
+    # monitor.send_items で実際に送り、Discordの返事(HTTPコード)を記録する。
+    if os.environ.get("DIAG_SEND") == "1":
+        L.append("")
+        if not should_send:
+            L.append("送信テスト: 『通知されるはず』の商品が無いため未実施")
+        else:
+            results = []
+
+            def capture(payload):
+                url = os.environ.get("DISCORD_WEBHOOK_URL", "").strip()
+                req = urllib.request.Request(
+                    url, data=json.dumps(payload).encode("utf-8"),
+                    headers={"Content-Type": "application/json",
+                             "User-Agent": "sedori-bot/1.0 (+https://github.com/ryosugihara/sedori)"})
+                try:
+                    with urllib.request.urlopen(req, timeout=30) as r:
+                        results.append(f"HTTP {r.status} 成功")
+                except urllib.error.HTTPError as e:
+                    results.append(f"HTTP {e.code} 失敗: {e.read().decode('utf-8', 'replace')[:300]}")
+                except Exception as e:
+                    results.append(f"失敗: {e}")
+
+            monitor.discord_post = capture  # send_items/send_text の送信部分だけ差し替え
+            monitor.send_text("🧪 テスト送信（KINDAL通知の診断）：本番と同じ形式で1件送ります")
+            monitor.send_items([should_send[0]])
+            L.append(f"送信テスト: {should_send[0].get('title', '')[:40]} → {' / '.join(results)}")
 
     L += ["", "=== 行き先の内訳 ==="]
     L += [f"{n:4d} {r}" for r, n in funnel.most_common()]
