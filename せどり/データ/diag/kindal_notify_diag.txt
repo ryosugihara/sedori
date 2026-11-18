@@ -6,6 +6,8 @@ saint-laurent-paris: 出品574件 / うち新着32件
 yves-saint-laurent: 出品78件 / うち新着7件
 undercover: 出品893件 / うち新着46件
 
+送信テスト: チェスターコート → HTTP 204 成功 / HTTP 204 成功
+
 === 行き先の内訳 ===
   42 only_keywords(デニムのみ等)
   13 派手語なし・利益不足
