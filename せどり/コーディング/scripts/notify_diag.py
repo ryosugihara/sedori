@@ -101,6 +101,8 @@ def main():
                 reason = "only_keywords(デニムのみ等)"
             else:
                 why = priority.skip_reason(t, c)
+                if why == "シンプル服" and priority.notify_simple_new():
+                    why = None  # 本番の新着通知と同じく、シンプル服も通す設定
                 if why:
                     reason = why
             if reason is None:

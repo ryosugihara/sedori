@@ -577,6 +577,10 @@ def check_source(brands, seen, first_run, get_items, do_slow=True, wait=None):
                 if priority is not None:
                     why = priority.skip_reason(it.get("title", ""),
                                                it.get("category", ""))
+                    # 新着通知ではシンプル服も通す設定なら、シンプル服は止めない
+                    # （2026-11 依頼: 全部の店でシンプルな服も通知する。服以外は止めたまま）
+                    if why == "シンプル服" and priority.notify_simple_new():
+                        why = None
                     if why:
                         skipped_by_priority[why] = skipped_by_priority.get(why, 0) + 1
                         continue

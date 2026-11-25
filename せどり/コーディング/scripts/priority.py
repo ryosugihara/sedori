@@ -137,6 +137,16 @@ def only_distinctive():
         return False
 
 
+def notify_simple_new():
+    """店の新着通知で『シンプル服』も通知するか。
+    （シンプル服_調査しない は在庫スキャン・メルカリ内スキャンでも使うため、
+      新着通知だけ別のスイッチで通せるようにしている）"""
+    try:
+        return bool(_conf().get("新着通知_シンプル服も通知する", False))
+    except Exception:
+        return False
+
+
 def is_simple(text):
     """シンプルな服か（無地系のカテゴリで、派手さを示す言葉が1つも無い）"""
     try:
