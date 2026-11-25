@@ -1,0 +1,24 @@
+{
+  "_メモ": "RAGTAG(ラグタグ)オンラインで見張るブランド。自社サイト(ragtag.jp)はボット対策で読めないため、運営会社(ティンパンアレイ)のYahoo!ショッピング公式店『RAGTAG Online Shop』を新着順で検索する。search=お店の中で検索する言葉、title_keywords=商品名にこのどれかを含む物だけ通知(検索は説明文にも当たるため)。keyword は『見た記録』の名前。only_keywords=その言葉を含む物だけ通知。",
+  "brands": [
+    {
+      "name": "Saint Laurent",
+      "keyword": "ragtag:saint-laurent",
+      "search": "SAINT LAURENT",
+      "title_keywords": ["saint laurent", "サンローラン"]
+    },
+    {
+      "name": "Undercover",
+      "keyword": "ragtag:undercover",
+      "search": "UNDERCOVER",
+      "title_keywords": ["under cover", "undercover", "アンダーカバー"],
+      "only_keywords": ["デニム", "denim", "ジーンズ", "jeans"]
+    },
+    {
+      "name": "Dior Homme",
+      "keyword": "ragtag:dior-homme",
+      "search": "Dior Homme",
+      "title_keywords": ["dior homme", "ディオールオム"]
+    }
+  ]
+}
