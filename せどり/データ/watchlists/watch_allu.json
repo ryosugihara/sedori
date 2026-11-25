@@ -1,0 +1,7 @@
+{
+  "_メモ": "ALLU(アリュー)オンライン(allu-official.com)で見張るブランド。code=売り場URLのブランド番号(b-数字)、category=カテゴリ番号(c-28=アパレル)。keyword は『見た記録』の名前。1つの行が1回の読み込み。Undercoverは売り場が見つからなかった(ALLUは高級ブランド中心でほぼ扱いが無い)ため入れていない。",
+  "brands": [
+    {"name": "Saint Laurent", "keyword": "allu:saint-laurent", "code": "b-95", "category": "c-28"},
+    {"name": "Dior Homme", "keyword": "allu:dior-homme", "code": "b-31", "category": "c-28"}
+  ]
+}
