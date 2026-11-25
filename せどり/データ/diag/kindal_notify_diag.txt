@@ -1,104 +1,110 @@
 KINDAL新着通知の診断（過去7日の新着を本番と同じ判定に通した結果）
 Discordの宛先(webhook): 有効（名前: Spidey Bot）
 画像判定の準備(相場DB+AI): OK
-派手か利益だけ通知: True
-saint-laurent-paris: 出品574件 / うち新着32件
-yves-saint-laurent: 出品78件 / うち新着7件
-undercover: 出品893件 / うち新着46件
+派手か利益だけ通知: False
+saint-laurent-paris: 出品580件 / うち新着31件
+yves-saint-laurent: 出品81件 / うち新着6件
+undercover: 出品917件 / うち新着56件
 
-送信テスト: チェスターコート → HTTP 204 成功 / HTTP 204 成功
+送信テスト: パーカー596491 → HTTP 204 成功 / HTTP 204 成功
 
 === 行き先の内訳 ===
-  42 only_keywords(デニムのみ等)
-  13 派手語なし・利益不足
+  54 only_keywords(デニムのみ等)
+  23 ★通知されるはず
   11 除外リスト
-   9 シンプル服
-   6 ★通知されるはず
-   4 服以外(カテゴリ)
+   5 服以外(カテゴリ)
 
 === 1件ずつ ===
-[服以外(カテゴリ)] SL14H Signature Court ClassicハイカットスニーカーDM 361275 [シューズ] ¥24,860  https://shop.kind.co.jp/products/8107000255538
-[除外リスト] ショルダーバッグ330958 [バッグ] ¥55,660  https://shop.kind.co.jp/products/8042001043152
-[★通知されるはず] チェスターコート [アウター] ¥220,660 派手語=あり 照合=なし 利益=None https://shop.kind.co.jp/products/8040001396490
-[シンプル服] スウェットパンツ769061 [ボトムス] ¥33,660  https://shop.kind.co.jp/products/8003002082083
-[派手語なし・利益不足] オールインワン [ボトムス] ¥99,660 派手語=なし 照合=なし 利益=None https://shop.kind.co.jp/products/8040001396483
-[派手語なし・利益不足] ジップアップジャケット [アウター] ¥138,160 派手語=なし 照合=なし 利益=None https://shop.kind.co.jp/products/8020001555608
-[派手語なし・利益不足] 2015 エディ期 モーターサイクルダブルライダースジャケット397287 [アウター] ¥176,660 派手語=なし 照合=なし 利益=None https://shop.kind.co.jp/products/8004002057194
-[派手語なし・利益不足] ジップアップブルゾン [アウター] ¥77,660 派手語=なし 照合=なし 利益=None https://shop.kind.co.jp/products/8001001202426
-[派手語なし・利益不足] 16SS エディ期L17 クラシック モーターサイクルダブルライダースジャケット [アウター] ¥330,660 派手語=なし 照合=あり 利益=-160460 https://shop.kind.co.jp/products/8040001401453
-[シンプル服] レザーショートパンツ [ボトムス] ¥33,660  https://shop.kind.co.jp/products/8040001395479
-[服以外(カテゴリ)] チェーンブレスレット819760 Y 1500 [アクセサリー] ¥33,660  https://shop.kind.co.jp/products/8042001056671
-[シンプル服] ストレートパンツ530732 Y104T [ボトムス] ¥17,160  https://shop.kind.co.jp/products/8042001050921
-[シンプル服] バミューダパンツ667906 [ボトムス] ¥44,660  https://shop.kind.co.jp/products/8042001050129
-[シンプル服] コーデュロイパンツ [ボトムス] ¥28,160  https://shop.kind.co.jp/products/8040001389089
-[除外リスト] サングラスSL 859/K [ファッション小物] ¥33,660  https://shop.kind.co.jp/products/8005002139972
-[シンプル服] スモーキングスラックス [ボトムス] ¥24,860  https://shop.kind.co.jp/products/8040001396100
-[★通知されるはず] 2022AW　シルクドットシャツ　長袖シャツ　01SN 646850 Y301W [トップス] ¥33,770 派手語=あり 照合=なし 利益=None https://shop.kind.co.jp/products/8054000264858
-[除外リスト] 2WAYショルダーバッグ [バッグ] ¥88,660  https://shop.kind.co.jp/products/8045001463142
-[服以外(カテゴリ)] ペイズリー柄ストール372292 [ファッション小物] ¥22,660  https://shop.kind.co.jp/products/8042001051959
-[除外リスト] サングラスSL M131 [ファッション小物] ¥39,160  https://shop.kind.co.jp/products/8003002073944
-[除外リスト] 3つ折り財布 [財布・小物] ¥9,460  https://shop.kind.co.jp/products/8080000855581
-[シンプル服] バイカーパンツ [ボトムス] ¥165,660  https://shop.kind.co.jp/products/8040001396995
-[★通知されるはず] ブラッドラスター総柄シャツ [トップス] ¥77,660 派手語=あり 照合=なし 利益=None https://shop.kind.co.jp/products/8040001397008
-[★通知されるはず] レオパードファーモッズコート [アウター] ¥198,660 派手語=あり 照合=なし 利益=None https://shop.kind.co.jp/products/8040001396988
-[★通知されるはず] 14AWアームレザー切替スウェット361555 Y2FC1 [トップス] ¥11,660 派手語=あり 照合=なし 利益=None https://shop.kind.co.jp/products/8107000255576
-[派手語なし・利益不足] テディジャケット [アウター] ¥121,660 派手語=なし 照合=なし 利益=None https://shop.kind.co.jp/products/8045001463487
-[派手語なし・利益不足] ダブルプレストジャケット686287 [アウター] ¥72,160 派手語=なし 照合=なし 利益=None https://shop.kind.co.jp/products/8080000853365
-[派手語なし・利益不足] メルトンシングルロングコート537428 [アウター] ¥66,660 派手語=なし 照合=なし 利益=None https://shop.kind.co.jp/products/8080000853358
-[派手語なし・利益不足] ファーフーディ 中綿 ミリタリーコート397648 [アウター] ¥88,660 派手語=なし 照合=なし 利益=None https://shop.kind.co.jp/products/8106000107670
-[派手語なし・利益不足] 4AWマーモットファーダブルライダースジャケット361704-Y5GC1 [アウター] ¥220,660 派手語=なし 照合=あり 利益=-36960 https://shop.kind.co.jp/products/8003002076372
-[服以外(カテゴリ)] チェーンブレスレット819760 Y 1500 8060 [アクセサリー] ¥33,660  https://shop.kind.co.jp/products/8042001056664
-[★通知されるはず] ダメージ加工クラシックロゴスウェット498282 [トップス] ¥14,960 派手語=あり 照合=なし 利益=None https://shop.kind.co.jp/products/8078000630031
-[除外リスト] サングラスYSL 6032/S [ファッション小物] ¥6,050  https://shop.kind.co.jp/products/8084000158628
-[派手語なし・利益不足] ローブ [アウター] ¥10,560 派手語=なし 照合=なし 利益=None https://shop.kind.co.jp/products/8001001186634
-[除外リスト] 2つ折り財布 [財布・小物] ¥6,160  https://shop.kind.co.jp/products/8080000856847
-[除外リスト] レザーショルダーバッグ [バッグ] ¥50,160  https://shop.kind.co.jp/products/8080000855871
-[派手語なし・利益不足] ウールステンカラーコート [アウター] ¥17,160 派手語=なし 照合=なし 利益=None https://shop.kind.co.jp/products/8001001134857
-[派手語なし・利益不足] テ―ラードジャケット [アウター] ¥7,260 派手語=なし 照合=なし 利益=None https://shop.kind.co.jp/products/8032001064127
-[除外リスト] 2WAYショルダーバッグ284885 [バッグ] ¥22,660  https://shop.kind.co.jp/products/8004002051581
-[only_keywords(デニムのみ等)] 18SSBIG TEE SCREW SNオーバーサイズスクリュープリントTシャツ [トップス] ¥8,800  https://shop.kind.co.jp/products/8069000153156
-[only_keywords(デニムのみ等)] チェックニットセーターUCZ1911-1 [トップス] ¥28,160  https://shop.kind.co.jp/products/8003001895370
-[only_keywords(デニムのみ等)] WEEK END MONDAYSパーカーUCW9807 [トップス] ¥8,360  https://shop.kind.co.jp/products/8033002558721
-[only_keywords(デニムのみ等)] 21AW フリースジャケット [アウター] ¥24,860  https://shop.kind.co.jp/products/8020001586442
-[only_keywords(デニムのみ等)] ノーカラーファーコート [アウター] ¥55,660  https://shop.kind.co.jp/products/8020001554748
-[only_keywords(デニムのみ等)] コーチジャケットUCV9207-1 [アウター] ¥13,860  https://shop.kind.co.jp/products/8005001997689
-[only_keywords(デニムのみ等)] スラックスUC1B9501 [ボトムス] ¥28,160  https://shop.kind.co.jp/products/8004002027463
-[only_keywords(デニムのみ等)] パンツuc2f4504 [ボトムス] ¥33,660  https://shop.kind.co.jp/products/8003002081369
-[only_keywords(デニムのみ等)] ジップパーカーCWSC123 [トップス] ¥33,660  https://shop.kind.co.jp/products/8003002081390
-[only_keywords(デニムのみ等)] ジャケットUS2D4291 [アウター] ¥39,160  https://shop.kind.co.jp/products/8003002081406
-[only_keywords(デニムのみ等)] 26SS T／Cツイル ワークパンツ [ボトムス] ¥28,160  https://shop.kind.co.jp/products/8040001402696
-[only_keywords(デニムのみ等)] スウェットup2f4808 [トップス] ¥24,860  https://shop.kind.co.jp/products/8003002081437
-[only_keywords(デニムのみ等)] ジャケットUC2F4104 [アウター] ¥55,660  https://shop.kind.co.jp/products/8003002081376
-[only_keywords(デニムのみ等)] ポロシャツUC2F4901-2 [トップス] ¥33,660  https://shop.kind.co.jp/products/8003002081413
-[only_keywords(デニムのみ等)] クルーネックスウェットUC2C4804 [トップス] ¥17,160  https://shop.kind.co.jp/products/8003002083547
-[only_keywords(デニムのみ等)] 23SSApple treeバックプリントフーデッドノースリーブパーカーUI1C4805 [トップス] ¥33,660  https://shop.kind.co.jp/products/8080000856731
-[除外リスト] ドッキングデザインワンピース [ワンピース] ¥33,660  https://shop.kind.co.jp/products/8040001392072
-[only_keywords(デニムのみ等)] 10SS20WATER CAMOウエストポーチ [バッグ] ¥17,160  https://shop.kind.co.jp/products/8079000980065
-[only_keywords(デニムのみ等)] 25SS創空 SOUKUU Season4 Hike Mountain PantsマウンテンTECH [ボトムス] ¥32,890  https://shop.kind.co.jp/products/8069000153811
-[only_keywords(デニムのみ等)] 25SS創空SOUKUU Season4 Hike Backpack Mountain Jacket [アウター] ¥59,400  https://shop.kind.co.jp/products/8069000153804
-[only_keywords(デニムのみ等)] 長袖TシャツUC2B9819-2 [トップス] ¥18,260  https://shop.kind.co.jp/products/8078000593275
-[only_keywords(デニムのみ等)] デイパックEK62032X [バッグ] ¥13,860  https://shop.kind.co.jp/products/8003002034099
-[only_keywords(デニムのみ等)] 26SS but beautiful 4．5 Cordura Padded Jacket UC1F4 [アウター] ¥99,660  https://shop.kind.co.jp/products/8005002151165
-[only_keywords(デニムのみ等)] 21SSチェックパンツUC1A4506-1 [ボトムス] ¥12,760  https://shop.kind.co.jp/products/8107000130712
-[除外リスト] 21SSジレドッキングテーラードジャケットUC1A4109 [アウター] ¥28,160  https://shop.kind.co.jp/products/8107000130705
-[only_keywords(デニムのみ等)] セットアップスーツL4102 5/L4505 5 [セットアップ] ¥33,660  https://shop.kind.co.jp/products/8018001983859
-[only_keywords(デニムのみ等)] ウールパンツ [ボトムス] ¥28,160  https://shop.kind.co.jp/products/8040001396407
-[only_keywords(デニムのみ等)] スウェットパンツ [ボトムス] ¥13,860  https://shop.kind.co.jp/products/8001001196473
-[only_keywords(デニムのみ等)] 17AW UISM STAY WEIRDバックプリント ダブル ライダース レザー ジャケット [アウター] ¥88,000  https://shop.kind.co.jp/products/8056000281644
-[only_keywords(デニムのみ等)] ストラップハイヒール [シューズ] ¥17,160  https://shop.kind.co.jp/products/8040001392089
-[only_keywords(デニムのみ等)] 22AWコーデュロイパンツUI2B4505-2 [ボトムス] ¥14,960  https://shop.kind.co.jp/products/8079001019313
-[only_keywords(デニムのみ等)] チェックパンツ5A245-P7 [ボトムス] ¥22,660  https://shop.kind.co.jp/products/8003001896490
-[only_keywords(デニムのみ等)] トラックパンツUC1F9501 [ボトムス] ¥16,060  https://shop.kind.co.jp/products/8015001087099
-[only_keywords(デニムのみ等)] イージーパンツ [ボトムス] ¥22,660  https://shop.kind.co.jp/products/8040001396391
-[only_keywords(デニムのみ等)] ジップワークパンツ [ボトムス] ¥22,660  https://shop.kind.co.jp/products/8040001396377
-[only_keywords(デニムのみ等)] 03AWpaperdoll期ストール [ファッション小物] ¥61,160  https://shop.kind.co.jp/products/8086000315148
-[only_keywords(デニムのみ等)] フーデッドダウンジャケット [アウター] ¥50,160  https://shop.kind.co.jp/products/8045001298355
-[シンプル服] デニムパンツ001YZ-0000 [ボトムス] ¥28,160  https://shop.kind.co.jp/products/8006002407757
-[only_keywords(デニムのみ等)] フェード加工ダウンジャケット [アウター] ¥61,160  https://shop.kind.co.jp/products/8045001298348
-[シンプル服] BLACK SENSE MARKET限定デニムパンツ02203AP10 [ボトムス] ¥22,660  https://shop.kind.co.jp/products/8039001810747
-[only_keywords(デニムのみ等)] 25AW/V．A．カプセルコレクションコラボTEE／Tシャツ/UC2E9819 [トップス] ¥18,700  https://shop.kind.co.jp/products/8065000240872
-[only_keywords(デニムのみ等)] ハンドバッグ [バッグ] ¥9,460  https://shop.kind.co.jp/products/8015001090334
-[only_keywords(デニムのみ等)] ナイロンパンツ [ボトムス] ¥9,460  https://shop.kind.co.jp/products/8020001610567
-[only_keywords(デニムのみ等)] スタジャンUC-4A-JK-O2 [アウター] ¥17,160  https://shop.kind.co.jp/products/8005001873891
-[only_keywords(デニムのみ等)] 19AWPullover HoodieパーカーCD7525-100 [トップス] ¥9,460  https://shop.kind.co.jp/products/8103000248471
-[only_keywords(デニムのみ等)] 12AWフードスタジャンJ4207-2 [アウター] ¥44,660  https://shop.kind.co.jp/products/8003001896452
+[★通知されるはず] パーカー596491 [トップス] ¥22,550 派手語=なし 照合=なし 利益=None https://shop.kind.co.jp/products/8084000327321
+[★通知されるはず] ドット刺繍シャツ327249 Y112A [トップス] ¥28,050 派手語=あり 照合=なし 利益=None https://shop.kind.co.jp/products/8087000189968
+[除外リスト] トートバッグGNR499290 [バッグ] ¥77,660  https://shop.kind.co.jp/products/8079001024416
+[★通知されるはず] エディ期デニムベスト421281 [トップス] ¥33,660 派手語=なし 照合=なし 利益=None https://shop.kind.co.jp/products/8079001020807
+[服以外(カテゴリ)] 型押しサイドゴアブーツ393733 [シューズ] ¥33,660  https://shop.kind.co.jp/products/8078000617940
+[★通知されるはず] 21AWTEDDY JACKETスタジャンVB5S 354718 Y180W 1070 [アウター] ¥99,660 派手語=なし 照合=なし 利益=None https://shop.kind.co.jp/products/8032001078360
+[除外リスト] スモールカメラバッグ [バッグ] ¥198,660  https://shop.kind.co.jp/products/8020001621402
+[★通知されるはず] ニット604798 [トップス] ¥17,160 派手語=なし 照合=なし 利益=None https://shop.kind.co.jp/products/8005002048540
+[除外リスト] 【Rive Gauche Tote Bag】トートバッグGNR509415 [バッグ] ¥99,660  https://shop.kind.co.jp/products/8042001060944
+[★通知されるはず] デニムパンツD12G 587035 [ボトムス] ¥17,160 派手語=なし 照合=なし 利益=None https://shop.kind.co.jp/products/8042001060920
+[★通知されるはず] スモーキングセットアップスーツ [セットアップ] ¥127,160 派手語=なし 照合=なし 利益=None https://shop.kind.co.jp/products/8045001467164
+[除外リスト] クラッチバッグ [バッグ] ¥22,660  https://shop.kind.co.jp/products/8040001397817
+[★通知されるはず] スパンコールジップブルゾン603482 Y1A02 [アウター] ¥99,660 派手語=あり 照合=あり 利益=-64370 https://shop.kind.co.jp/products/8080000859329
+[★通知されるはず] デニムパンツ527379 YB477 [ボトムス] ¥22,660 派手語=なし 照合=なし 利益=None https://shop.kind.co.jp/products/8080000859350
+[除外リスト] カメラバッグ644276 [バッグ] ¥88,660  https://shop.kind.co.jp/products/8042001060333
+[除外リスト] レザーショルダーバッグGNR821003 [バッグ] ¥154,660  https://shop.kind.co.jp/products/8042001059122
+[服以外(カテゴリ)] スニーカー [シューズ] ¥17,160  https://shop.kind.co.jp/products/8104000218754
+[除外リスト] ル サンカセット ラージ ハンドバッグ [バッグ] ¥275,660  https://shop.kind.co.jp/products/8045001470171
+[服以外(カテゴリ)] チェーンネックレス [アクセサリー] ¥13,860  https://shop.kind.co.jp/products/8032001077295
+[★通知されるはず] テディジャケット [アウター] ¥165,660 派手語=なし 照合=あり 利益=-67460 https://shop.kind.co.jp/products/8040001312599
+[除外リスト] サック ド ジュール ナノバッグ392035 [バッグ] ¥132,660  https://shop.kind.co.jp/products/8106000116634
+[★通知されるはず] レザーフライトジャケット493487 [アウター] ¥275,660 派手語=なし 照合=なし 利益=None https://shop.kind.co.jp/products/8003001961150
+[★通知されるはず] ショールネック スウェット [トップス] ¥33,660 派手語=なし 照合=なし 利益=None https://shop.kind.co.jp/products/8001001203362
+[★通知されるはず] ロゴ ドット柄 ボンバージャケット [アウター] ¥88,660 派手語=あり 照合=なし 利益=None https://shop.kind.co.jp/products/8001001203294
+[★通知されるはず] D16 M／BG-LWストレートデニムパンツ500170 [ボトムス] ¥18,150 派手語=なし 照合=なし 利益=None https://shop.kind.co.jp/products/8047000148969
+[★通知されるはず] トレンチコート739440 [アウター] ¥110,660 派手語=なし 照合=なし 利益=None https://shop.kind.co.jp/products/8042001059825
+[除外リスト] サックドジュール ナノ ハンドバッグ2WAYショルダーバッグ [バッグ] ¥105,160  https://shop.kind.co.jp/products/8086000391418
+[除外リスト] フラグメントケース609362 [財布・小物] ¥22,660  https://shop.kind.co.jp/products/8042001060357
+[★通知されるはず] ブラッシュドストラライプニットクルーネックニット665838 [トップス] ¥31,460 派手語=なし 照合=なし 利益=None https://shop.kind.co.jp/products/8039001537910
+[★通知されるはず] ショートパンツ542580 [ボトムス] ¥33,660 派手語=なし 照合=なし 利益=None https://shop.kind.co.jp/products/8042001057180
+[★通知されるはず] 長袖シャツ564172 [トップス] ¥33,660 派手語=なし 照合=なし 利益=None https://shop.kind.co.jp/products/8077001110689
+[服以外(カテゴリ)] レザーシューズ3502 840 [シューズ] ¥7,260  https://shop.kind.co.jp/products/8104000207802
+[除外リスト] ベロアテーラードジャケット75830Y [アウター] ¥17,160  https://shop.kind.co.jp/products/8005001958024
+[★通知されるはず] ボウタイブラウス 90Sヴィンテージ [トップス] ¥6,050 派手語=なし 照合=なし 利益=None https://shop.kind.co.jp/products/8066000302973
+[★通知されるはず] ニットカーディガン [トップス] ¥22,660 派手語=なし 照合=なし 利益=None https://shop.kind.co.jp/products/8001001135045
+[服以外(カテゴリ)] ブーツ7275 [シューズ] ¥17,160  https://shop.kind.co.jp/products/8004002052243
+[★通知されるはず] ウールコート [アウター] ¥13,860 派手語=なし 照合=なし 利益=None https://shop.kind.co.jp/products/8108000148707
+[only_keywords(デニムのみ等)] 05SS20but beautiful2期フェイスバンドフロントプリント半袖Tシャツ [トップス] ¥22,550  https://shop.kind.co.jp/products/8084000327345
+[only_keywords(デニムのみ等)] 長袖シャツUC1F4402 [トップス] ¥20,460  https://shop.kind.co.jp/products/8018002011490
+[only_keywords(デニムのみ等)] コーデュロイパンツNN-P4751 [ボトムス] ¥20,460  https://shop.kind.co.jp/products/8080000861834
+[only_keywords(デニムのみ等)] ホーススウェードブーツ966V-EYE/UC1D4F01 [シューズ] ¥220,660  https://shop.kind.co.jp/products/8004002038568
+[only_keywords(デニムのみ等)] 12SSストライプシャツI14401-1 [トップス] ¥7,150  https://shop.kind.co.jp/products/8084000327147
+[only_keywords(デニムのみ等)] ナイロンパンツ [ボトムス] ¥22,660  https://shop.kind.co.jp/products/8020001620177
+[only_keywords(デニムのみ等)] トレーナーUC2F4892-1 [トップス] ¥14,960  https://shop.kind.co.jp/products/8006002440495
+[only_keywords(デニムのみ等)] トレーナーUC2F4892-1 [トップス] ¥22,660  https://shop.kind.co.jp/products/8004002064741
+[only_keywords(デニムのみ等)] Cindy Sherman Print SweatshirtトレーナーUC2F4815-2 [トップス] ¥25,960  https://shop.kind.co.jp/products/8004002064734
+[only_keywords(デニムのみ等)] 長袖TシャツUC1E4892-2 [トップス] ¥10,560  https://shop.kind.co.jp/products/8006002440501
+[only_keywords(デニムのみ等)] イージーパンツUI1C4507 [ボトムス] ¥9,460  https://shop.kind.co.jp/products/8003002083561
+[only_keywords(デニムのみ等)] スラックスD4519 [ボトムス] ¥22,660  https://shop.kind.co.jp/products/8003002041325
+[★通知されるはず] 裾断ち切りカツラギデニムパンツUC1A4509 [ボトムス] ¥13,860 派手語=なし 照合=なし 利益=None https://shop.kind.co.jp/products/8003002040724
+[only_keywords(デニムのみ等)] ローカットスニーカーUC2E9F03 [シューズ] ¥20,460  https://shop.kind.co.jp/products/8003002071414
+[only_keywords(デニムのみ等)] 11AWMIRROR期 ベルテッドボンテージパンツH4503-4 [ボトムス] ¥11,660  https://shop.kind.co.jp/products/8003002041332
+[only_keywords(デニムのみ等)] スウェットパンツUCX4510 [ボトムス] ¥11,660  https://shop.kind.co.jp/products/8003002040632
+[only_keywords(デニムのみ等)] 24AW TWIN PEAKS MA-1ツインピークス グラフィック ロゴ エムエーワン ボンバー  [アウター] ¥88,000  https://shop.kind.co.jp/products/8056000266573
+[only_keywords(デニムのみ等)] プルオーバーニット長袖セーターUCT4913 [トップス] ¥13,860  https://shop.kind.co.jp/products/8103000257817
+[only_keywords(デニムのみ等)] パンツUCZ4501-4 [ボトムス] ¥13,860  https://shop.kind.co.jp/products/8103000257794
+[only_keywords(デニムのみ等)] トラックジャケットUC1F9201 [アウター] ¥24,860  https://shop.kind.co.jp/products/8015001087082
+[★通知されるはず] デニムパンツUC2D8503 [ボトムス] ¥35,860 派手語=なし 照合=なし 利益=None https://shop.kind.co.jp/products/8018002007554
+[only_keywords(デニムのみ等)] トレーナーUC2E9820 [トップス] ¥18,260  https://shop.kind.co.jp/products/8003002090163
+[only_keywords(デニムのみ等)] スウェットUC1B4801 [トップス] ¥17,160  https://shop.kind.co.jp/products/8005001977551
+[only_keywords(デニムのみ等)] 切替スウェットUP1E1803 [トップス] ¥28,160  https://shop.kind.co.jp/products/8018002007530
+[only_keywords(デニムのみ等)] 26AWCindy Shermanカシミヤ混スウェットUC2F4807-2 [トップス] ¥38,060  https://shop.kind.co.jp/products/8106000104976
+[only_keywords(デニムのみ等)] フリルスラックス [ボトムス] ¥22,660  https://shop.kind.co.jp/products/8040001401910
+[only_keywords(デニムのみ等)] Rabbit Padlock Keyringラビットパドロックキーホルダー [アクセサリー] ¥88,660  https://shop.kind.co.jp/products/8040001398715
+[only_keywords(デニムのみ等)] Dunk HighハイカットスニーカーDD9401-600 [シューズ] ¥9,460  https://shop.kind.co.jp/products/8079001021972
+[only_keywords(デニムのみ等)] U LOGO COACH JACKET Uロゴ バックプリント コーチジャケット [アウター] ¥6,600  https://shop.kind.co.jp/products/8056000282191
+[only_keywords(デニムのみ等)] スパイダーネストカーゴパンツ [ボトムス] ¥29,260  https://shop.kind.co.jp/products/8045001471000
+[only_keywords(デニムのみ等)] アナーキープリントスウェットパンツ [ボトムス] ¥22,660  https://shop.kind.co.jp/products/8020001618884
+[only_keywords(デニムのみ等)] ANARCHY IS THE KEY CREW NECK SWEAT アナーキープリントスウェット [トップス] ¥24,860  https://shop.kind.co.jp/products/8020001618877
+[only_keywords(デニムのみ等)] ロゴカーゴパンツCD7529-010 [ボトムス] ¥9,460  https://shop.kind.co.jp/products/8001001173191
+[only_keywords(デニムのみ等)] Dunk High ChaosハイカットスニーカーDQ4121-001 [シューズ] ¥11,660  https://shop.kind.co.jp/products/8079001021910
+[only_keywords(デニムのみ等)] シャツジャケット [アウター] ¥20,460  https://shop.kind.co.jp/products/8003001806734
+[only_keywords(デニムのみ等)] 26AW刺繍9TWENTY キャップUB0E6H01-1 [ファッション小物] ¥9,900  https://shop.kind.co.jp/products/8105000018108
+[only_keywords(デニムのみ等)] リングウールパンツ [ボトムス] ¥22,660  https://shop.kind.co.jp/products/8040001396384
+[only_keywords(デニムのみ等)] プリントスウェット [トップス] ¥17,160  https://shop.kind.co.jp/products/8040001396360
+[only_keywords(デニムのみ等)] トレーナーuc1e9803-2 [トップス] ¥17,160  https://shop.kind.co.jp/products/8003002090361
+[only_keywords(デニムのみ等)] REACT PRESTOスニーカーCU3459-200 [シューズ] ¥6,160  https://shop.kind.co.jp/products/8005002151127
+[only_keywords(デニムのみ等)] AIR FORCE1 LOW SP UCスニーカーDQ7558-101 [シューズ] ¥6,160  https://shop.kind.co.jp/products/8005002151134
+[only_keywords(デニムのみ等)] 16FW Coaches Jacketコーチジャケット [アウター] ¥55,660  https://shop.kind.co.jp/products/8020001621372
+[only_keywords(デニムのみ等)] Nylon Twill Blouson切替ナイロンジャケット21-0387S [アウター] ¥44,660  https://shop.kind.co.jp/products/8032001076557
+[only_keywords(デニムのみ等)] アンゴラシャギーポロニット UC2E1908 [トップス] ¥33,660  https://shop.kind.co.jp/products/8005001901242
+[only_keywords(デニムのみ等)] レザー切替ダウンジャケットN4201 [アウター] ¥22,660  https://shop.kind.co.jp/products/8005001906803
+[only_keywords(デニムのみ等)] 3レイヤー フィッシュテールパーカー [アウター] ¥33,660  https://shop.kind.co.jp/products/8001001173207
+[only_keywords(デニムのみ等)] 切替ダウンジャケットUS2E4291 [アウター] ¥39,160  https://shop.kind.co.jp/products/8005001900849
+[only_keywords(デニムのみ等)] 刺繍デザイン ハウンドトゥーススラックスUCQ1501-02 [ボトムス] ¥7,150  https://shop.kind.co.jp/products/8084000325020
+[only_keywords(デニムのみ等)] 00AW20MELTING POT期 Fuckerスカーフ [ファッション小物] ¥39,160  https://shop.kind.co.jp/products/8101000428398
+[only_keywords(デニムのみ等)] 24AWニットUC2D8901 [トップス] ¥35,860  https://shop.kind.co.jp/products/8005002005581
+[only_keywords(デニムのみ等)] チェックシャツレイヤードスウェットUI2B4809 [トップス] ¥24,860  https://shop.kind.co.jp/products/8042001057982
+[only_keywords(デニムのみ等)] フライトジャケットUC2A4205 [アウター] ¥41,360  https://shop.kind.co.jp/products/8042001057913
+[only_keywords(デニムのみ等)] スウェットUC2E9806 [トップス] ¥24,860  https://shop.kind.co.jp/products/8042001057487
+[only_keywords(デニムのみ等)] 19AWV FACE UFOトレーナーSV0MF06Z5PD [トップス] ¥25,960  https://shop.kind.co.jp/products/8006002428202
+[only_keywords(デニムのみ等)] スラックスUCP1508-1 [ボトムス] ¥8,360  https://shop.kind.co.jp/products/8006002428233
+[only_keywords(デニムのみ等)] 異素材パーカーJUT4805 [トップス] ¥7,260  https://shop.kind.co.jp/products/8009002269011
