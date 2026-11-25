@@ -1,0 +1,22 @@
+{
+  "_メモ": "買取王国オンライン(okoku.jp)で見張るブランド。お店全体の新着の中から vendors(ブランド表記) か title_keywords(商品名の言葉) に合う物を抜き出す。keyword は『見た記録』の名前（サイト検索には使わない）。only_keywords=その言葉を含む物だけ通知。ブランド表記は https://okoku.jp/pages/brand-list で確認できる。",
+  "brands": [
+    {
+      "name": "Saint Laurent",
+      "keyword": "okoku:saint-laurent",
+      "vendors": ["SAINT LAURENT", "SAINT LAURENT PARIS", "Yves Saint Laurent"]
+    },
+    {
+      "name": "Undercover",
+      "keyword": "okoku:undercover",
+      "vendors": ["UNDERCOVER", "UNDERCOVERISM", "JohnUNDERCOVER", "SueUNDERCOVER"],
+      "only_keywords": ["デニム", "denim", "ジーンズ", "jeans"]
+    },
+    {
+      "name": "Dior Homme",
+      "keyword": "okoku:dior-homme",
+      "vendors": ["Dior homme"],
+      "title_keywords": ["ディオールオム", "dior homme"]
+    }
+  ]
+}

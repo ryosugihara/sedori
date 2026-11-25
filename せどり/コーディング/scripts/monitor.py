@@ -27,6 +27,7 @@ import trefac  # トレファク用の読み取り部品（同じフォルダの
 import rinkan  # RINKAN用の読み取り部品（同じフォルダの rinkan.py）
 import hardoff  # おふもーる(ハードオフ)用の読み取り部品（同じフォルダの hardoff.py）
 import takayama  # 高山質店オンライン用の読み取り部品（同じフォルダの takayama.py）
+import okoku  # 買取王国オンライン用の読み取り部品（同じフォルダの okoku.py）
 
 # 画像照合（メルカリ相場DBと写真を見比べる部品）。
 # AIの道具が入っていない環境でも監視が止まらないよう、失敗したら無しで動く。
@@ -62,6 +63,9 @@ HARDOFF_STATE_FILE = "せどり/データ/state/hardoff_seen.json"  # おふも�
 
 TAKAYAMA_BRANDS_FILE = "せどり/データ/watchlists/watch_takayama.json"  # 高山質店 の見張るブランド一覧
 TAKAYAMA_STATE_FILE = "せどり/データ/state/takayama_seen.json"  # 高山質店 の「見た商品」記録
+
+OKOKU_BRANDS_FILE = "せどり/データ/watchlists/watch_okoku.json"  # 買取王国 の見張るブランド一覧
+OKOKU_STATE_FILE = "せどり/データ/state/okoku_seen.json"  # 買取王国 の「見た商品」記録
 
 SCAN_PROFIT_SEEN_FILE = "せどり/データ/state/scan_profit_seen.json"  # 在庫スキャンで送信済みの商品記録(重複通知防止)
 SCAN_PROFIT_REPORT_FILE = "せどり/データ/recon/SCAN_PROFIT.txt"  # 送信した商品名・金額・リンクの記録(あとで見返す用)
@@ -767,6 +771,8 @@ def scan_profitable():
          hardoff.fetch_brand_items, "オフモール"),
         (load_json_file(TAKAYAMA_BRANDS_FILE, {"brands": []}).get("brands", []),
          takayama.fetch_brand_items, "高山質店"),
+        (load_json_file(OKOKU_BRANDS_FILE, {"brands": []}).get("brands", []),
+         okoku.fetch_brand_items, "買取王国"),
     ]
 
     # 全ブランドを調べ終えてからまとめて送信すると、5サイト×全ブランドの
@@ -870,6 +876,7 @@ def main():
     rinkan_brands = load_json_file(RINKAN_BRANDS_FILE, {"brands": []}).get("brands", [])
     hardoff_brands = load_json_file(HARDOFF_BRANDS_FILE, {"brands": []}).get("brands", [])
     takayama_brands = load_json_file(TAKAYAMA_BRANDS_FILE, {"brands": []}).get("brands", [])
+    okoku_brands = load_json_file(OKOKU_BRANDS_FILE, {"brands": []}).get("brands", [])
 
     # これまでに「見た商品」の記録を読み込む（サイトごとに別ファイル）
     kindal_seen = load_json_file(STATE_FILE, {})
@@ -878,14 +885,17 @@ def main():
     rinkan_seen = load_json_file(RINKAN_STATE_FILE, {})
     hardoff_seen = load_json_file(HARDOFF_STATE_FILE, {})
     takayama_seen = load_json_file(TAKAYAMA_STATE_FILE, {})
+    okoku_seen = load_json_file(OKOKU_STATE_FILE, {})
     kindal_first = (len(kindal_seen) == 0)  # 記録が空っぽなら初回
     trefac_first = (len(trefac_seen) == 0)
     bring_first = (len(bring_seen) == 0)
     rinkan_first = (len(rinkan_seen) == 0)
     hardoff_first = (len(hardoff_seen) == 0)
     takayama_first = (len(takayama_seen) == 0)
+    okoku_first = (len(okoku_seen) == 0)
 
-    def one_pass(k_first, t_first, b_first, r_first, h_first, do_slow=True, ta_first=False):
+    def one_pass(k_first, t_first, b_first, r_first, h_first, do_slow=True, ta_first=False,
+                 ok_first=False):
         """全サイトを1回ずつチェックして、新着をまとめて返す。
         do_slow=False のときは②ブランド(利益が出る時だけ通知)を省いて軽く回す。
         """
@@ -896,6 +906,7 @@ def main():
         new += check_source(rinkan_brands, rinkan_seen, r_first, rinkan.fetch_brand_items, do_slow)
         new += check_source(hardoff_brands, hardoff_seen, h_first, hardoff.fetch_brand_items, do_slow)
         new += check_source(takayama_brands, takayama_seen, ta_first, takayama.fetch_brand_items, do_slow)
+        new += check_source(okoku_brands, okoku_seen, ok_first, okoku.fetch_brand_items, do_slow)
         return new
 
     def save_all():
@@ -905,16 +916,17 @@ def main():
         save_json_file(RINKAN_STATE_FILE, rinkan_seen)
         save_json_file(HARDOFF_STATE_FILE, hardoff_seen)
         save_json_file(TAKAYAMA_STATE_FILE, takayama_seen)
+        save_json_file(OKOKU_STATE_FILE, okoku_seen)
 
     def start_message():
         all_brands = (
             kindal_brands + trefac_brands + bring_brands + rinkan_brands + hardoff_brands
-            + takayama_brands
+            + takayama_brands + okoku_brands
         )
         names = sorted({b["name"] for b in all_brands})
         send_text(
             "✅ 新着監視を開始/更新しました！\n"
-            "監視中の店: KINDAL、トレファク、BRING、RINKAN、オフモール、高山質店\n"
+            "監視中の店: KINDAL、トレファク、BRING、RINKAN、オフモール、高山質店、買取王国\n"
             f"対象ブランド: {'、'.join(names)}\n"
             f"これから約{POLL_SECONDS}秒ごとに新着をチェックします。"
         )
@@ -925,9 +937,9 @@ def main():
     # --- 1回だけチェックするモード（手動の動作確認用）---
     if not loop_mode:
         new_items = one_pass(kindal_first, trefac_first, bring_first, rinkan_first, hardoff_first,
-                             ta_first=takayama_first)
+                             ta_first=takayama_first, ok_first=okoku_first)
         if (kindal_first or trefac_first or bring_first or rinkan_first or hardoff_first
-                or takayama_first):
+                or takayama_first or okoku_first):
             start_message()
         if new_items:
             send_items(new_items)
@@ -996,9 +1008,9 @@ def main():
 
     # まず最初の1回チェック（②ブランドも含めて全部見て記録する）
     new_items = one_pass(kindal_first, trefac_first, bring_first, rinkan_first, hardoff_first,
-                         do_slow=True, ta_first=takayama_first)
+                         do_slow=True, ta_first=takayama_first, ok_first=okoku_first)
     if (kindal_first or trefac_first or bring_first or rinkan_first or hardoff_first
-            or takayama_first):
+            or takayama_first or okoku_first):
         start_message()
     if new_items:
         send_items(new_items)
@@ -1023,6 +1035,9 @@ def main():
         # 高山質店は takayama.py の中で『同じ検索は10分に1回』に抑えている。ここで30秒ごとに
         # 呼んでも、10分たつまでは前回の結果を返すだけでお店には読みに行かない
         ("高山質店", takayama_brands, takayama_seen, takayama.fetch_brand_items),
+        # 買取王国は全ブランドで『お店全体の新着ページ』1枚を使い回す（okoku.py）。
+        # 3ブランド分の仕事があっても、お店への読み込みは30秒に1回程度
+        ("買取王国", okoku_brands, okoku_seen, okoku.fetch_brand_items),
     ]:
         for i, b in enumerate(brands_):
             other_tasks.append((f"{site}:{i}", site, b, seen_, getter))
