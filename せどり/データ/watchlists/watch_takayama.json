@@ -1,11 +1,43 @@
 {
   "_メモ": "高山質店オンライン(takayama78online.jp)で見張るブランド。name=通知に出る名前 / keyword=サイトで検索する言葉 / tree=カテゴリ(80=メンズファッション、90=レディースファッション)。1つの行が1回の検索になる。お店から許可を得て10分ごとに読んでいる(2026-11-25)。行を増やすとお店への読み込みも増えるので注意。Undercoverは在庫がほぼ無いため入れていない。",
   "brands": [
-    {"name": "Saint Laurent", "keyword": "SAINT LAURENT", "tree": "80"},
-    {"name": "Saint Laurent", "keyword": "SAINT LAURENT", "tree": "90"},
-    {"name": "GUCCI", "keyword": "GUCCI", "tree": "80"},
-    {"name": "GUCCI", "keyword": "GUCCI", "tree": "90"},
-    {"name": "CELINE", "keyword": "CELINE", "tree": "80"},
-    {"name": "CELINE", "keyword": "CELINE", "tree": "90"}
-  ]
+    {
+      "name": "Saint Laurent",
+      "keyword": "SAINT LAURENT",
+      "tree": "80"
+    },
+    {
+      "name": "Saint Laurent",
+      "keyword": "SAINT LAURENT",
+      "tree": "90"
+    },
+    {
+      "name": "Dior Homme",
+      "keyword": "DIOR HOMME",
+      "tree": "80"
+    }
+  ],
+  "_停止中のブランド": [
+    {
+      "name": "GUCCI",
+      "keyword": "GUCCI",
+      "tree": "80"
+    },
+    {
+      "name": "GUCCI",
+      "keyword": "GUCCI",
+      "tree": "90"
+    },
+    {
+      "name": "CELINE",
+      "keyword": "CELINE",
+      "tree": "80"
+    },
+    {
+      "name": "CELINE",
+      "keyword": "CELINE",
+      "tree": "90"
+    }
+  ],
+  "_2026-11-25の変更": "GUCCI・CELINE を通知から外して停止中へ移動、Dior Homme(メンズのみ・レディースは在庫がほぼ無い)を追加。検索は6本→3本に減った"
 }

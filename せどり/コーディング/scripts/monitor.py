@@ -171,8 +171,16 @@ def kindal_items_newest(brand):
 
 
 def bring_items(brand):
-    """BRING(wastenot) の1ブランドの全商品を、通知用の形(idつき)で返す"""
-    products = fetch_collection_products(brand["collection"], BRING_SHOP)
+    """BRING(wastenot) の1ブランドの全商品を、通知用の形(idつき)で返す。
+    first_page_only=true のブランドは1ページ目(新しい順の250件)だけを読む
+    （Dior売り場のように1,800件近くある売り場を30秒ごとに全ページ読むと、お店への負担が大きいため。
+      実測 2026-11-25: 1ページ目に直近2週間分が入る）"""
+    if brand.get("first_page_only"):
+        data = http_get_json(f"{BRING_SHOP}/collections/{brand['collection']}/products.json"
+                             f"?limit={PER_PAGE}&page=1")
+        products = data.get("products", [])
+    else:
+        products = fetch_collection_products(brand["collection"], BRING_SHOP)
     return [build_item(p, brand["name"], BRING_SHOP, "BRING") for p in products]
 
 
@@ -543,7 +551,10 @@ def check_source(brands, seen, first_run, get_items, do_slow=True, wait=None):
         if b.get("profit_only") and not do_slow and not b.get("fast"):
             continue
         # 識別子：KINDALは collection、トレファクは keyword を使う
-        key = b.get("collection") or b.get("keyword")
+        # seen_key があればそれを『見た記録』の名前に使う。長く止めていたブランドを戻す時に
+        # 新しい名前にすると『新規ブランド』扱いになり、初回は記録だけで通知しない
+        # （古い記録のまま戻すと、止めていた間の入荷が全部『新着』として一度に届いてしまう）
+        key = b.get("seen_key") or b.get("collection") or b.get("keyword")
         try:
             items = get_items(b)
         except Exception as e:

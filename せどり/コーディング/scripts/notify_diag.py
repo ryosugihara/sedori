@@ -82,7 +82,7 @@ def main():
     rows = []
     should_send = []  # 『通知されるはず』の商品（送信テスト用）
     for b in brands:
-        key = b.get("collection") or b.get("keyword")
+        key = b.get("seen_key") or b.get("collection") or b.get("keyword")
         try:
             items = monitor.kindal_items(b)
         except Exception as e:
