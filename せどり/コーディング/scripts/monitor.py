@@ -155,6 +155,17 @@ def kindal_items(brand):
     return [build_item(p, brand["name"], SHOP, "KINDAL") for p in products]
 
 
+def kindal_items_newest(brand):
+    """KINDAL の1ブランドの『1ページ目(250件)』だけを返す（高速チェック用）。
+    KINDALの売り場は新しい商品ほど先頭に並ぶため、新着は1ページ目に入る
+    （実測 2026-11-25: 1ページ目に直近1〜1.5か月分）。1回0.3〜0.4秒で取れるので
+    10秒ごとに見られる。取りこぼし防止に、全ページの確認も10分ごとに別途行う。
+    """
+    url = f"{SHOP}/collections/{brand['collection']}/products.json?limit={PER_PAGE}&page=1"
+    data = http_get_json(url)
+    return [build_item(p, brand["name"], SHOP, "KINDAL") for p in data.get("products", [])]
+
+
 def bring_items(brand):
     """BRING(wastenot) の1ブランドの全商品を、通知用の形(idつき)で返す"""
     products = fetch_collection_products(brand["collection"], BRING_SHOP)
@@ -499,8 +510,12 @@ def matches_only(item, only_keywords):
     return any(k.lower() in text for k in only_keywords)
 
 
-def check_source(brands, seen, first_run, get_items, do_slow=True):
+def check_source(brands, seen, first_run, get_items, do_slow=True, wait=None):
     """1つのサイトの全ブランドを1回チェックして、新着リストを返す。
+
+    wait … ブランドを1つ見るごとに待つ秒数（同じサイトへの連続アクセスの間隔）。
+            省略時は REQUEST_WAIT。ループ監視で『1ブランドずつの小さな仕事』として
+            呼ぶ時は、仕事の間隔そのものがサイトへの間隔になるので短くしてよい。
 
     get_items(brand) … そのブランドの商品一覧（id付きの辞書リスト）を返す関数。
     KINDAL でもトレファクでも、この共通処理で扱える。
@@ -608,7 +623,7 @@ def check_source(brands, seen, first_run, get_items, do_slow=True):
 
         # 見た商品リストを更新（今ある商品IDを全部覚える）
         seen[key] = sorted(seen_ids | set(current_ids))
-        time.sleep(REQUEST_WAIT)
+        time.sleep(REQUEST_WAIT if wait is None else wait)
     return new_items
 
 
@@ -897,9 +912,58 @@ def main():
     # ②(profit_only)の重い全ブランド巡回は、走ると数分かかり その間 ①や fast の
     # 高速チェックを止めてしまう。頻度を下げて(10分ごと)高速ブランドの足を引っ張らない
     # ようにする。全ブランドの棚卸しは毎日の在庫スキャンが別途担当する。
-    SLOW_SECONDS = int(os.environ.get("SLOW_SECONDS", "600"))  # ②は何秒ごとに見るか
-    print(f"ループ監視開始: {POLL_SECONDS}秒ごと / ②ブランドは{SLOW_SECONDS}秒ごと / 最長 {LOOP_MINUTES}分")
-    end_time = time.time() + LOOP_MINUTES * 60
+    SLOW_SECONDS = int(os.environ.get("SLOW_SECONDS", "600"))  # ②・KINDAL全ページは何秒ごとに見るか
+    # KINDALは新着が出るとすぐ売れるため、1ページ目だけを短い間隔で見る（2026-11 依頼: 10秒ごと）
+    KINDAL_SECONDS = int(os.environ.get("KINDAL_POLL_SECONDS", "10"))
+    # RINKANは10〜12時に出品が多いので、その時間帯だけ短い間隔で見る（2026-11 依頼）
+    RINKAN_WINDOW = os.environ.get("RINKAN_WINDOW", "10:00-12:00")          # 日本時間
+    RINKAN_WINDOW_SECONDS = int(os.environ.get("RINKAN_WINDOW_SECONDS", "10"))
+    # この時間帯には監視の交代（次の回の準備に5〜10分かかる）を入れない。
+    # 終わりの時刻がこの時間帯（の少し前〜終わり）に重なる時は、時間帯の前に交代を済ませる。
+    PROTECT_WINDOWS = os.environ.get("PROTECT_WINDOWS", RINKAN_WINDOW)
+    HANDOFF_LEAD_MIN = int(os.environ.get("HANDOFF_LEAD_MIN", "20"))         # 何分前までに交代するか
+
+    def parse_windows(spec):
+        """'10:00-12:00,20:00-21:00' → [(600, 720), (1200, 1260)]（日本時間の0時からの分）"""
+        out = []
+        for part in (spec or "").split(","):
+            part = part.strip()
+            if not part:
+                continue
+            try:
+                a, b = part.split("-")
+                ha, ma = map(int, a.split(":"))
+                hb, mb = map(int, b.split(":"))
+                out.append((ha * 60 + ma, hb * 60 + mb))
+            except Exception:
+                print(f"  時間帯の書き方が読めません: {part}")
+        return out
+
+    def jst_min(ts):
+        t = time.gmtime(ts + 9 * 3600)
+        return t.tm_hour * 60 + t.tm_min
+
+    def in_windows(ts, wins):
+        m = jst_min(ts)
+        return any(s <= m < e for s, e in wins)
+
+    def adjust_end(end_ts, wins):
+        """終わりの時刻が守りたい時間帯に重なるなら、時間帯の開始 HANDOFF_LEAD_MIN 分前に早める"""
+        for s, e in wins:
+            m = jst_min(end_ts)
+            if s - HANDOFF_LEAD_MIN <= m <= e:
+                earlier = end_ts - (m - (s - HANDOFF_LEAD_MIN)) * 60
+                if earlier > time.time() + 10 * 60:  # 早めた結果が今すぐ過ぎなら、そのまま
+                    print(f"  交代が守りたい時間帯に重なるため、終了を {s // 60:02d}:{s % 60:02d} の"
+                          f"{HANDOFF_LEAD_MIN}分前に早めます")
+                    return earlier
+        return end_ts
+
+    rinkan_wins = parse_windows(RINKAN_WINDOW)
+    end_time = adjust_end(time.time() + LOOP_MINUTES * 60, parse_windows(PROTECT_WINDOWS))
+    print(f"ループ監視開始: KINDALは{KINDAL_SECONDS}秒ごと(1ページ目)・全ページは{SLOW_SECONDS}秒ごと / "
+          f"他の店は{POLL_SECONDS}秒ごと（RINKANは{RINKAN_WINDOW}の間{RINKAN_WINDOW_SECONDS}秒ごと） / "
+          f"②ブランドは{SLOW_SECONDS}秒ごと / 終了 {time.strftime('%H:%M', time.gmtime(end_time + 9 * 3600))}(日本時間)")
 
     # まず最初の1回チェック（②ブランドも含めて全部見て記録する）
     new_items = one_pass(kindal_first, trefac_first, bring_first, rinkan_first, hardoff_first, do_slow=True)
@@ -909,21 +973,70 @@ def main():
         send_items(new_items)
     save_all()
     git_save_state()  # 記録をすぐサーバーに保存（重複通知を防ぐ）
-    last_slow = time.time()  # ②ブランドを最後に見た時刻
 
-    # 決めた時間内は、くり返しチェックし続ける（2回目以降は初回扱いしない）
-    while time.time() < end_time:
-        time.sleep(POLL_SECONDS)
-        # ②ブランドを見るタイミングか判定（SLOW_SECONDS 経過したら見る）
-        do_slow = (time.time() - last_slow) >= SLOW_SECONDS
-        if do_slow:
-            last_slow = time.time()
-        items = one_pass(False, False, False, False, False, do_slow=do_slow)
+    def handle(items):
         if items:
             print(f"新着 {len(items)} 件 → 通知")
             send_items(items)
             save_all()
             git_save_state()  # 通知したら即サーバー保存（重複通知を防ぐ）
+
+    # 仕事の一覧。他の店は『1ブランドずつ』の小さな仕事に分ける。1つの仕事が数秒で終わるので、
+    # その合間にKINDALの10秒チェックを差し込める（大きな巡回でKINDALが待たされない）。
+    other_tasks = []  # (目印, 店, ブランド設定, 見た記録, 取得関数)
+    for site, brands_, seen_, getter in [
+        ("トレファク", trefac_brands, trefac_seen, trefac.fetch_brand_items),
+        ("BRING", bring_brands, bring_seen, bring_items),
+        ("RINKAN", rinkan_brands, rinkan_seen, rinkan.fetch_brand_items),
+        ("オフモール", hardoff_brands, hardoff_seen, hardoff.fetch_brand_items),
+    ]:
+        for i, b in enumerate(brands_):
+            other_tasks.append((f"{site}:{i}", site, b, seen_, getter))
+
+    def task_interval(site, b, now):
+        if b.get("profit_only") and not b.get("fast"):
+            return SLOW_SECONDS  # ②ブランドはゆっくり巡回（従来通り）
+        if site == "RINKAN" and in_windows(now, rinkan_wins):
+            return RINKAN_WINDOW_SECONDS
+        return POLL_SECONDS
+
+    now0 = time.time()
+    next_run = {"kindal": now0 + KINDAL_SECONDS, "kindal_full": now0 + SLOW_SECONDS}
+    for j, t in enumerate(other_tasks):
+        # 開始直後に全部の仕事が一度に来ないよう、少しずつずらす
+        next_run[t[0]] = now0 + POLL_SECONDS * (j + 1) / max(1, len(other_tasks))
+
+    # 決めた時間内は、くり返しチェックし続ける（2回目以降は初回扱いしない）
+    while time.time() < end_time:
+        now = time.time()
+        try:
+            # ① KINDAL 1ページ目（最優先）
+            if now >= next_run["kindal"]:
+                next_run["kindal"] = now + KINDAL_SECONDS
+                # 同じKINDALへ3回続けて読みに行くので、間は0.3秒だけ空ける
+                handle(check_source(kindal_brands, kindal_seen, False, kindal_items_newest, True,
+                                    wait=0.3))
+                continue
+            # ② KINDAL 全ページ（1ページ目より後ろに新着が紛れた時の保険）
+            if now >= next_run["kindal_full"]:
+                next_run["kindal_full"] = now + SLOW_SECONDS
+                handle(check_source(kindal_brands, kindal_seen, False, kindal_items, True))
+                continue
+            # ③ 他の店：期限が来た仕事のうち、一番待っているもの1つだけ
+            due = [t for t in other_tasks if now >= next_run[t[0]]]
+            if due:
+                key, site, b, seen_, getter = min(due, key=lambda t: next_run[t[0]])
+                # RINKANの時間帯に入った瞬間から短い間隔に切り替わるよう、次回を先に決める
+                next_run[key] = now + task_interval(site, b, now)
+                # 1ブランドだけの仕事なので、ブランド後の待ちは不要（仕事の間隔がサイトへの間隔）
+                handle(check_source([b], seen_, False, getter, True, wait=0))
+                continue
+        except Exception as e:
+            # 1つの仕事の失敗で監視全体を止めない
+            print(f"  チェック中のエラー（続行）: {e}")
+        # 次の仕事までの待ち時間（最大1秒ずつ待って様子を見る）
+        wait = min(next_run.values()) - time.time()
+        time.sleep(max(0.2, min(1.0, wait)))
 
     # 最後に記録を保存して終了（次の見張りが続きから始められる）
     save_all()

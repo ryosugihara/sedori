@@ -1,14 +1,21 @@
-# KINDAL 新着監視（30秒ごとに見張り続けるループ方式）
+# 新着監視（KINDALは10秒ごと・他の店は30秒ごとに見張り続けるループ方式）
 name: KINDAL新着監視
 
 on:
   schedule:
-    # 2時間ごとに起動予約を入れる。前の監視(5時間ループ)が動いている間は、
-    # 同じconcurrencyグループ(cancel-in-progress:false)で「次の1回」が待機し、
-    # 前の回が終わった直後に引き継ぐ。PAT(自動再起動)が無くても途切れない。
-    # ※待機中の予約が新しい予約に置き換わると古い方は cancelled と表示されるが、無害。
-    # （以前は6時間ごとで、PAT切れの間は1日約9時間の見張り空白ができていた: 2026-11）
+    # 本命の継続方法は「終わる時に次の回を自分で起動する」(下の最後のステップ)。
+    # 定時起動はチェーンが切れた時の保険。※GitHubは混雑時に定時起動を間引くため
+    # (実測 2026-11: 2時間ごと予約でも1日2〜3回しか起動されなかった)、これだけには頼らない。
     - cron: "17 */2 * * *" # 2時間ごと（毎時0分の混雑を避けて17分）
+    - cron: "20 0 * * *"   # 毎日 9:20(日本時間)。RINKANの10〜12時に必ず監視を動かすための保険
+  push:
+    # 監視のプログラムを直して保存したら、新しいプログラムですぐ監視を始める
+    # （動いている回があれば、その回が終わった直後に新しいプログラムで引き継ぐ）
+    branches:
+      - claude/adoring-bell-7rqznj
+    paths:
+      - ".github/workflows/monitor.yml"
+      - "せどり/コーディング/scripts/monitor.py"
   workflow_dispatch: # 手動でも開始できる
     inputs:
       loop_minutes:
@@ -18,6 +25,7 @@ on:
 
 permissions:
   contents: write
+  actions: write # 終わる時に次の監視を自分で起動するため（GITHUB_TOKENで可能・PAT不要）
 
 # 同時に2つ動いて記録がぶつからないようにする
 concurrency:
@@ -29,6 +37,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 360 # 安全のための最大時間（6時間）
     steps:
+      - name: 開始時刻を記録（異常終了時の連続再起動を防ぐ判定に使う）
+        run: echo "START_TS=$(date +%s)" >> "$GITHUB_ENV"
+
       - name: リポジトリを取得
         uses: actions/checkout@v4
 
@@ -64,7 +75,10 @@ jobs:
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           LOOP_MODE: "1" # ループ監視を有効にする
-          POLL_SECONDS: "30" # 何秒ごとにチェックするか（小さいほど速い／サイトに優しくするなら大きく）
+          POLL_SECONDS: "30" # KINDAL以外の店を何秒ごとにチェックするか
+          KINDAL_POLL_SECONDS: "10" # KINDAL(1ページ目)を何秒ごとにチェックするか
+          RINKAN_WINDOW: "10:00-12:00" # RINKANの出品が多い時間帯(日本時間)。この間は監視の交代もしない
+          RINKAN_WINDOW_SECONDS: "10" # 上の時間帯にRINKANを何秒ごとにチェックするか
           LOOP_MINUTES: ${{ github.event.inputs.loop_minutes || '300' }} # 1回の見張り時間（分）
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }} # 無料AIのカギ(あれば最終確認に使う)
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }} # 有料AIのカギ(任意)
@@ -89,19 +103,29 @@ jobs:
           done
           echo "::warning::状態の保存(push)に失敗しました。次回実行で再通知が起きる可能性があります"
 
-      - name: 次の監視を自動で開始（PATがある時だけ）
-        if: success() # 正常に終わった時だけ（クラッシュ時の連続再起動を防ぐ）
+      - name: 次の監視を自動で開始（GITHUB_TOKENで起動・PAT不要）
+        # 手動で止めた(cancelled)時は起動しない。異常終了でも、30分以上動いていたなら
+        # 一時的な失敗とみなして再起動する（すぐ落ちる不具合の時は連続再起動しない）。
+        if: ${{ !cancelled() }}
         env:
-          PAT: ${{ secrets.PAT_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          JOB_STATUS: ${{ job.status }}
         run: |
-          if [ -n "$PAT" ]; then
-            echo "次の監視を自動起動します"
-            curl -sS -X POST \
-              -H "Authorization: Bearer $PAT" \
+          elapsed=$(( $(date +%s) - ${START_TS:-0} ))
+          if [ "$JOB_STATUS" != "success" ] && [ "$elapsed" -lt 1800 ]; then
+            echo "::warning::開始から${elapsed}秒で異常終了したため、連続再起動を避けて自動起動しません（定時起動が保険）"
+            exit 0
+          fi
+          # GITHUB_TOKEN が起こしたイベントは普通は新しい実行を作らないが、
+          # workflow_dispatch だけは例外的に作れる（GitHubの仕様）
+          for i in 1 2 3; do
+            code=$(curl -s -o /tmp/dispatch.txt -w "%{http_code}" -X POST \
+              -H "Authorization: Bearer $GH_TOKEN" \
               -H "Accept: application/vnd.github+json" \
               "https://api.github.com/repos/${{ github.repository }}/actions/workflows/monitor.yml/dispatches" \
-              -d '{"ref":"${{ github.ref_name }}"}'
-          else
-            echo "PAT_TOKEN 未設定のため自動再起動はスキップ（cron/手動に依存）"
-          fi
+              -d '{"ref":"${{ github.ref_name }}"}')
+            if [ "$code" = "204" ]; then echo "次の監視を起動しました"; exit 0; fi
+            echo "起動に失敗 (HTTP $code): $(head -c 300 /tmp/dispatch.txt) → 再試行 $i/3"; sleep 10
+          done
+          echo "::warning::次の監視を起動できませんでした（定時起動が保険）"
 
