@@ -63,6 +63,9 @@ def parse_products(data, brand_name):
                 "image": images[0] if images else None,
                 "shop": SHOP_NAME,
                 "category": p.get("category_name", ""),
+                # サイズ（APIの variants に入っている。例: ['42']）。相場をサイズ別に出すのに使う
+                "size": (str((p.get("variants") or [""])[0]) if isinstance(p.get("variants"), list)
+                         else str(p.get("variants") or "")),
             }
         )
     return items
