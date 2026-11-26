@@ -32,7 +32,27 @@ import statistics
 
 DB_FILE = "せどり/データ/data/souba_db.sqlite"
 
-_cache = {"loaded": False, "brands": {}}
+_cache = {"loaded": False, "brands": {}, "v2": False}
+
+# 『利益ラインを超えていたのに、最終確認(色・幾何・AI)で裏付けが取れず落とした候補』の記録。
+# 最終確認が厳しすぎて本物まで落としていないかを、人の目で見直すために残す
+# （スキャンの最後に monitor.write_scan_diagnostics が recon/*_DROPPED.json に書き出す）。
+DROPPED = []
+
+_v2_state = {"checked": False, "ok": False}
+
+
+def _v2_available():
+    """新しい目（SigLIP + DINOv2-large + 背景切り抜き）の道具が入っているか（初回だけ確認）"""
+    if not _v2_state["checked"]:
+        _v2_state["checked"] = True
+        try:
+            import transformers  # noqa: F401
+            import rembg  # noqa: F401
+            _v2_state["ok"] = True
+        except Exception as e:
+            print(f"  新しい目の道具が無いため、旧の目で照合します: {e}")
+    return _v2_state["ok"]
 
 
 def _souba_days():
@@ -145,8 +165,10 @@ def ready():
     return True
 
 
-def _load():
-    """DBを読み込んで、ブランドごとに指紋の一覧を用意する（初回だけ）"""
+def _load(want_v2=False):
+    """DBを読み込んで、ブランドごとに指紋の一覧を用意する（初回だけ）。
+    want_v2=True で、DBに新しい目の指紋(vec3=SigLIP / vec4=DINOv2-large)があればそちらを使う。
+    """
     if _cache["loaded"]:
         return
     _cache["loaded"] = True
@@ -156,16 +178,21 @@ def _load():
     # 指紋は CLIP と DINO の両方が揃っている行だけ使う（二重チェックのため）。
     cutoff = int(time.time()) - _souba_days() * 86400
     cols = [r[1] for r in con.execute("PRAGMA table_info(items)")]
-    if "vec2" not in cols:
+    use_v2 = bool(want_v2) and "vec3" in cols and "vec4" in cols
+    if not use_v2 and "vec2" not in cols:
         con.close()
         print("  相場DBにDINO指紋がまだ無いため、画像照合は休止します")
         return
+    c1, c2 = ("vec3", "vec4") if use_v2 else ("vec", "vec2")
     rows = con.execute(
-        "SELECT id, name, price, brand, size, image_url, vec, vec2 "
-        "FROM items WHERE vec IS NOT NULL AND vec2 IS NOT NULL "
+        f"SELECT id, name, price, brand, size, image_url, {c1}, {c2} "
+        f"FROM items WHERE {c1} IS NOT NULL AND {c2} IS NOT NULL "
         "AND (updated IS NULL OR updated >= ?)", (cutoff,)
     ).fetchall()
     con.close()
+    _cache["v2"] = use_v2
+    print("  画像照合: " + ("新しい目（SigLIP＋DINOv2-large・背景切り抜き）"
+                            if use_v2 else "旧の目（CLIP＋DINOv2）"))
 
     # まとめ売り・ジャンク・新品など「中古1点の相場にならない実例」を外す。
     # DB側の掃除（collect_souba / souba_db_maintenance）が済む前でも効くよう、
@@ -228,7 +255,8 @@ def match_item(item, souba, stats=None, min_profit=None):
             _count("reason_その他_無地カテゴリ")
             return None
 
-        _load()
+        _load(bool(souba.get("eye_v2")) and _v2_available())
+        v2 = _cache.get("v2", False)
         bn = _norm_brand(item.get("brand", ""))
         got = _cache["brands"].get(bn)
         if not got:
@@ -246,9 +274,20 @@ def match_item(item, souba, stats=None, min_profit=None):
 
         import numpy as np
         import fingerprint
-        # 1回のダウンロードで、CLIPとDINOの2種類の指紋を作る
-        vec_c, vec_d = fingerprint.embed_image_url_both(item["image"])
-        if vec_c is None or vec_d is None:
+        # 写真は1回だけダウンロードして使い回す
+        raw_item = fingerprint.download_bytes(item["image"])
+        if raw_item is None:
+            _count("reason_その他_画像取得失敗")
+            return None
+        # 旧CLIPの指紋は『服以外・単調なデザイン』の写真判定(priority)に使うので、
+        # 新しい目の時も作る（軽い）。照合用の指紋は、新しい目なら服以外を除いた後で作る（重いため）
+        try:
+            vec_clip = fingerprint.embed_image_bytes(raw_item)
+            vec_c = vec_d = None
+            if not v2:
+                vec_c, vec_d = vec_clip, fingerprint.embed_image_bytes_dino(raw_item)
+        except Exception as e:
+            print(f"  画像の指紋化に失敗 ({str(item.get('image'))[:60]}): {e}")
             _count("reason_その他_画像取得失敗")
             return None
 
@@ -258,13 +297,20 @@ def match_item(item, souba, stats=None, min_profit=None):
         try:
             import priority
             # 服以外かどうか＋単調なデザインかどうかを、写真から判定する
-            why = priority.skip_by_image(vec_c) or priority.skip_by_pattern(vec_c)
+            why = priority.skip_by_image(vec_clip) or priority.skip_by_pattern(vec_clip)
             if why:
                 item["_priority_skip"] = why
                 _count(f"reason_その他_{why}")
                 return None
         except Exception:
             pass
+
+        if v2:
+            # 新しい目: 背景を切り抜いて SigLIP / DINOv2-large の指紋を作る
+            vec_c, vec_d = fingerprint.embed_bytes_v2(raw_item)
+            if vec_c is None or vec_d is None:
+                _count("reason_その他_新しい目の指紋化失敗")
+                return None
 
         mat_c, mat_d, rs = got
         sims_c = mat_c @ vec_c  # CLIP（見た目の系統）の近さ
@@ -275,6 +321,13 @@ def match_item(item, souba, stats=None, min_profit=None):
         strong_d = souba.get("strong_dino", 0.90)  # 同デザイン: DINO
         cand_c = souba.get("cand_th", 0.88)        # 似た系統: CLIP
         cand_d = souba.get("cand_dino", 0.80)      # 似た系統: DINO
+        if v2:
+            # 新しい目の合格ライン（recon/CALIB_V2.txt の実測: S0.85/D0.75 で
+            # 同じ商品の48%を拾い、違う商品の誤合格0.28%。旧の目は同じ誤合格率で約38%）
+            strong_c = souba.get("v2_strong_s", 0.85)
+            strong_d = souba.get("v2_strong_d", 0.85)
+            cand_c = souba.get("v2_cand_s", 0.85)
+            cand_d = souba.get("v2_cand_d", 0.75)
 
         # 両方のAIが「似ている」と言った実例だけを候補にする（二重チェック）
         ok = (sims_c >= cand_c) & (sims_d >= cand_d)
@@ -355,7 +408,6 @@ def match_item(item, souba, stats=None, min_profit=None):
         import geom_verify
         geo_th = int(souba.get("geo_inliers", 15))
         color_hist_th = float(souba.get("color_hist_th", 0.55))
-        raw_item = fingerprint.download_bytes(item["image"])
         if raw_item is None:
             _count("reason_その他_画像取得失敗")
             return None
@@ -366,6 +418,7 @@ def match_item(item, souba, stats=None, min_profit=None):
         verified_i = None
         verified_rank = None
         saw_pattern_reject = False
+        trail = []  # 候補ごとの答え合わせの結果（落とした候補の見直し用）
 
         for ci in picked:
             c, d = float(sims_c[ci]), float(sims_d[ci])
@@ -376,6 +429,7 @@ def match_item(item, souba, stats=None, min_profit=None):
 
             raw_ref = fingerprint.download_bytes(rs[ci][5]) if rs[ci][5] else None
             if raw_ref is None:
+                trail.append((ci, "メルカリの写真を取得できなかった"))
                 continue
 
             # 幾何検証(ORB)は白黒画像で処理するため色を一切見ておらず、ステッチや
@@ -389,6 +443,7 @@ def match_item(item, souba, stats=None, min_profit=None):
             color_dist = geom_verify.color_hist_distance(raw_item, raw_ref)
             if color_dist is not None and color_dist > color_hist_th:
                 _count("final_色違いで候補を除外")
+                trail.append((ci, f"色が違うと判定（色の差 {color_dist:.2f}・合格は{color_hist_th}以下）"))
                 continue
 
             inl = geom_verify.inlier_count(raw_item, raw_ref)
@@ -401,6 +456,8 @@ def match_item(item, souba, stats=None, min_profit=None):
                 break
 
             if ai_tries >= MAX_AI_TRIES:
+                trail.append((ci, f"形の一致点 {inl}点（合格{geo_th}点）・AI確認は回数上限で未実施"
+                                  + ("・柄物" if capped_c else "")))
                 continue
             ai_tries += 1
             import verify_ai
@@ -432,8 +489,38 @@ def match_item(item, souba, stats=None, min_profit=None):
                 break
             if v == "different" and capped_c:
                 saw_pattern_reject = True  # 柄物で明確に別物と判定された候補があった
+            if ai:
+                trail.append((ci, f"形の一致点 {inl}点（合格{geo_th}点）・AI判定「"
+                                  + {"different": "違う", "unsure": "不明"}.get(v, str(v))
+                                  + f"」{ai.get('score')}点：{str(ai.get('reason') or '')[:120]}"))
+            else:
+                trail.append((ci, f"形の一致点 {inl}点（合格{geo_th}点）・AI確認できず"))
 
         if verified is None:
+            notify_line = souba.get("notify_line", 2000)
+            if profit is not None and profit >= notify_line:
+                DROPPED.append({
+                    "shop": item.get("shop", ""),
+                    "brand": item.get("brand", ""),
+                    "title": item.get("title", ""),
+                    "price": buy,
+                    "url": item.get("url", ""),
+                    "image": item.get("image", ""),
+                    "estimate": estimate,
+                    "profit": profit,
+                    "confidence": pm["confidence"],
+                    "count": pm["n_used"],
+                    "eye": "新" if v2 else "旧",
+                    "candidates": [{
+                        "name": rs[ci][1] or "",
+                        "price": rs[ci][2],
+                        "url": f"https://jp.mercari.com/item/{rs[ci][0]}",
+                        "image": rs[ci][5],
+                        "sim_look": round(float(sims_c[ci]), 3),
+                        "sim_same": round(float(sims_d[ci]), 3),
+                        "why": why_txt,
+                    } for ci, why_txt in trail],
+                })
             if saw_pattern_reject:
                 _count("reason_類似度不足_柄物別物判定")
             else:

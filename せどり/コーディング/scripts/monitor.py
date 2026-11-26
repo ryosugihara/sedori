@@ -315,6 +315,12 @@ def load_souba():
         "strong_dino": s.get("画像一致_同デザイン_DINO", 0.90),  # 同デザイン: DINO
         "cand_th": s.get("画像一致_似た系統", 0.88),            # 似た系統: CLIP
         "cand_dino": s.get("画像一致_似た系統_DINO", 0.80),      # 似た系統: DINO
+        # 新しい目（SigLIP＋DINOv2-large・背景切り抜き）で照合するか、とその合格ライン
+        "eye_v2": s.get("画像照合_新しい目を使う", False),
+        "v2_strong_s": s.get("新しい目_同デザイン_SigLIP", 0.85),
+        "v2_strong_d": s.get("新しい目_同デザイン_DINO", 0.85),
+        "v2_cand_s": s.get("新しい目_似た系統_SigLIP", 0.85),
+        "v2_cand_d": s.get("新しい目_似た系統_DINO", 0.75),
         # 画像判定の対象外・照合条件（無地は判定しない／属性語は名前の一致が必要）
         "plain_cats": s.get("画像判定_無地カテゴリ", []),
         "feature_words": s.get("画像判定_特徴語", []),
@@ -681,6 +687,13 @@ def write_scan_diagnostics(path, total_fetched, examined, stats, sent_count):
     """『なぜ通知に至らなかったか』の内訳をファイルに書き出す（診断用）。
     stats は souba_match.match_item(..., stats=stats) で集計した辞書。
     """
+    # 利益ライン以上なのに最終確認で落とした候補を、写真URL・理由つきで残す（人が見直す用）
+    try:
+        dropped_path = path.replace("_STATS.txt", "_DROPPED.json")
+        with open(dropped_path, "w", encoding="utf-8") as f:
+            json.dump(souba_match.DROPPED, f, ensure_ascii=False, indent=1)
+    except Exception as e:
+        print(f"  落とした候補の記録に失敗: {e}")
     similar_found = stats.get("similar_found", 0)
     sim90 = stats.get("sim_90plus", 0)
     profit_neg = stats.get("profit_negative", 0)

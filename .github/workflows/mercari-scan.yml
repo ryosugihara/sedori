@@ -30,13 +30,15 @@ jobs:
       - name: AIモデルの置き場をキャッシュ
         uses: actions/cache@v4
         with:
-          path: ~/.cache/huggingface
-          key: clip-and-dinov2
+          path: |
+            ~/.cache/huggingface
+            ~/.u2net
+          key: eye-v1-v2-clip-dinov2-siglip-dinov2large-rembg
 
       - name: AIの道具を入れる
         run: |
           pip install --quiet torch torchvision --index-url https://download.pytorch.org/whl/cpu
-          pip install --quiet opencv-python-headless sentence-transformers transformers pillow pyjwt cryptography
+          pip install --quiet opencv-python-headless sentence-transformers pillow pyjwt cryptography transformers sentencepiece protobuf rembg onnxruntime
 
       - name: 相場DBをReleaseから取得（無ければ画像判定なしで続行）
         env:
