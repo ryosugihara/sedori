@@ -115,7 +115,12 @@ def http_get_json(url):
 
 
 def fetch_collection_products(handle, shop_base=SHOP):
-    """あるShopify店の、あるブランド(売り場)の全商品をページめくりで取得して返す"""
+    """あるShopify店の、あるブランド(売り場)の全商品をページめくりで取得して返す。
+    途中で読み込みに失敗したら、エラーにする（呼び出し側はそのブランドを今回は飛ばす）。
+    以前は失敗しても『読めた所まで(0件のことも)』を返していたが、新しく追加したブランドで
+    これが起きると『0件』と記録され、次に読めた時に今ある商品が全部『新着』として
+    一度に通知されてしまうため（2026-11-26 修正）。
+    """
     all_products = []
     for page in range(1, MAX_PAGES + 1):
         url = f"{shop_base}/collections/{handle}/products.json?limit={PER_PAGE}&page={page}"
@@ -123,7 +128,7 @@ def fetch_collection_products(handle, shop_base=SHOP):
             data = http_get_json(url)
         except Exception as e:
             print(f"  取得失敗 ({handle} page{page}): {e}")
-            break
+            raise
         products = data.get("products", [])
         if not products:
             break  # これ以上商品がなければ終わり
@@ -161,6 +166,7 @@ def build_item(product, brand_name, shop_base=SHOP, shop_label="KINDAL"):
         "image": images[0].get("src") if images else None,
         "shop": shop_label,
         "category": product.get("product_type", ""),  # 商品の分類（財布/バッグ等）
+        "vendor": product.get("vendor", ""),  # お店のブランド表記（例: BALMAIN / PIERRE BALMAIN）
     }
 
 
@@ -533,6 +539,18 @@ def matches_only(item, only_keywords):
     return any(k.lower() in text for k in only_keywords)
 
 
+def matches_skip(item, skip_keywords):
+    """ブランドに『この言葉を含む物は通知しない』指定がある場合の判定。
+    例: Balmain は別ブランドの PIERRE BALMAIN（ピエールバルマン）を除く。
+    商品名・分類・お店のブランド表記(vendor) のどれかに含まれていたら True。
+    """
+    if not skip_keywords:
+        return False
+    text = " ".join([item.get("title", ""), item.get("category", ""),
+                     item.get("vendor", "")]).lower()
+    return any(k.lower() in text for k in skip_keywords)
+
+
 def check_source(brands, seen, first_run, get_items, do_slow=True, wait=None):
     """1つのサイトの全ブランドを1回チェックして、新着リストを返す。
 
@@ -592,6 +610,8 @@ def check_source(brands, seen, first_run, get_items, do_slow=True, wait=None):
                 if is_excluded(it, excludes):
                     continue
                 if not matches_only(it, only_kw):
+                    continue
+                if matches_skip(it, b.get("skip_keywords")):
                     continue
                 # 服以外（バッグ・靴・小物）・シンプル服は通知しない。
                 # ここは①優先ブランドの新着も通る道なので、この絞り込みが

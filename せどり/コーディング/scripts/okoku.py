@@ -31,13 +31,17 @@ HEADERS = {
     "Accept-Language": "ja,en;q=0.9",
 }
 
-_cache = {"t": 0.0, "products": []}
+_cache = {"t": 0.0, "products": None}  # None = まだ一度も読めていない
 
 
 def newest_products():
     """お店全体の新着(1ページ目・新しい順250件)を返す。CACHE_SECONDS の間は使い回す"""
     now = time.time()
     if now - _cache["t"] < CACHE_SECONDS:
+        if _cache["products"] is None:
+            # まだ一度も読めていない（前回失敗）。0件として返すと『0件』と記録され、
+            # 次に読めた時に今ある商品が全部『新着』扱いになるので、エラーにする
+            raise RuntimeError("買取王国: 前回の読み込みに失敗したため、少し後に読み直します")
         return _cache["products"]
     req = urllib.request.Request(f"{BASE}/products.json?limit={PER_PAGE}&page=1", headers=HEADERS)
     try:

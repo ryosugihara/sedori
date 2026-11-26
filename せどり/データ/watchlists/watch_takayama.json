@@ -15,6 +15,18 @@
       "name": "Dior Homme",
       "keyword": "DIOR HOMME",
       "tree": "80"
+    },
+    {
+      "name": "Balmain",
+      "keyword": "BALMAIN",
+      "tree": "80",
+      "seen_key": "BALMAIN@80@2026-11-26",
+      "skip_keywords": [
+        "pierre balmain",
+        "ピエールバルマン",
+        "ピエール バルマン",
+        "ピエール・バルマン"
+      ]
     }
   ],
   "_停止中のブランド": [

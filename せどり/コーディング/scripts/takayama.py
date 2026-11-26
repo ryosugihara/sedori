@@ -108,13 +108,17 @@ def fetch_brand_items(brand):
     now = time.time()
     cached = _cache.get(key)
     if cached and now - cached[0] < INTERVAL_SECONDS:
+        if cached[1] is None:
+            # 前回失敗して、まだ一度も読めていない。0件として返すと『0件』と記録され、
+            # 次に読めた時に今ある商品が全部『新着』扱いになるので、エラーにする
+            raise RuntimeError("高山質店: 前回の読み込みに失敗したため、10分後に読み直します")
         return cached[1]
     url = SEARCH_URL.format(name=urllib.parse.quote(keyword.encode("cp932")), tree=tree)
     try:
         items = parse_items(_get(url), TREE_NAMES.get(tree, ""))
     except Exception:
         # 失敗しても、すぐに読み直してお店に負担をかけないよう、次の読み込みは10分後にする
-        _cache[key] = (now, cached[1] if cached else [])
+        _cache[key] = (now, cached[1] if cached else None)
         raise
     for it in items:
         it["brand"] = brand["name"]

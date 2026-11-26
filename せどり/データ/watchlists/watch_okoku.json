@@ -4,19 +4,55 @@
     {
       "name": "Saint Laurent",
       "keyword": "okoku:saint-laurent",
-      "vendors": ["SAINT LAURENT", "SAINT LAURENT PARIS", "Yves Saint Laurent"]
+      "vendors": [
+        "SAINT LAURENT",
+        "SAINT LAURENT PARIS",
+        "Yves Saint Laurent"
+      ]
     },
     {
       "name": "Undercover",
       "keyword": "okoku:undercover",
-      "vendors": ["UNDERCOVER", "UNDERCOVERISM", "JohnUNDERCOVER", "SueUNDERCOVER"],
-      "only_keywords": ["デニム", "denim", "ジーンズ", "jeans"]
+      "vendors": [
+        "UNDERCOVER",
+        "UNDERCOVERISM",
+        "JohnUNDERCOVER",
+        "SueUNDERCOVER"
+      ],
+      "only_keywords": [
+        "デニム",
+        "denim",
+        "ジーンズ",
+        "jeans"
+      ]
     },
     {
       "name": "Dior Homme",
       "keyword": "okoku:dior-homme",
-      "vendors": ["Dior homme"],
-      "title_keywords": ["ディオールオム", "dior homme"]
+      "vendors": [
+        "Dior homme"
+      ],
+      "title_keywords": [
+        "ディオールオム",
+        "dior homme"
+      ]
+    },
+    {
+      "name": "Balmain",
+      "keyword": "okoku:balmain",
+      "vendors": [
+        "BALMAIN"
+      ],
+      "title_keywords": [
+        "バルマン",
+        "balmain"
+      ],
+      "skip_keywords": [
+        "pierre balmain",
+        "ピエールバルマン",
+        "ピエール バルマン",
+        "ピエール・バルマン"
+      ]
     }
   ]
 }

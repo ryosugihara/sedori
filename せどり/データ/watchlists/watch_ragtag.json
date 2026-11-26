@@ -5,20 +5,50 @@
       "name": "Saint Laurent",
       "keyword": "ragtag:saint-laurent",
       "search": "SAINT LAURENT",
-      "title_keywords": ["saint laurent", "サンローラン"]
+      "title_keywords": [
+        "saint laurent",
+        "サンローラン"
+      ]
     },
     {
       "name": "Undercover",
       "keyword": "ragtag:undercover",
       "search": "UNDERCOVER",
-      "title_keywords": ["under cover", "undercover", "アンダーカバー"],
-      "only_keywords": ["デニム", "denim", "ジーンズ", "jeans"]
+      "title_keywords": [
+        "under cover",
+        "undercover",
+        "アンダーカバー"
+      ],
+      "only_keywords": [
+        "デニム",
+        "denim",
+        "ジーンズ",
+        "jeans"
+      ]
     },
     {
       "name": "Dior Homme",
       "keyword": "ragtag:dior-homme",
       "search": "Dior Homme",
-      "title_keywords": ["dior homme", "ディオールオム"]
+      "title_keywords": [
+        "dior homme",
+        "ディオールオム"
+      ]
+    },
+    {
+      "name": "Balmain",
+      "keyword": "ragtag:balmain",
+      "search": "BALMAIN",
+      "title_keywords": [
+        "balmain",
+        "バルマン"
+      ],
+      "skip_keywords": [
+        "pierre balmain",
+        "ピエールバルマン",
+        "ピエール バルマン",
+        "ピエール・バルマン"
+      ]
     }
   ]
 }
