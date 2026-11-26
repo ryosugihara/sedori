@@ -1,0 +1,464 @@
+[
+ {
+  "shop": "KINDAL",
+  "brand": "Saint Laurent",
+  "title": "カモフラージュジャケット370346",
+  "price": 36960,
+  "url": "https://shop.kind.co.jp/products/8080000834456",
+  "image": "https://cdn.shopify.com/s/files/1/0585/3010/3347/files/8080000834456_1.jpg?v=1791199316",
+  "estimate": 55000,
+  "profit": 11740,
+  "confidence": "低",
+  "count": 4,
+  "eye": "新",
+  "candidates": [
+   {
+    "name": "SAINT LAURENT エディ ストライプ テーラードジャケット",
+    "price": 55000,
+    "url": "https://jp.mercari.com/item/m29216527222",
+    "image": "https://static.mercdn.net/thumb/item/webp/m29216527222_1.jpg?1790943979",
+    "sim_look": 0.856,
+    "sim_same": 0.944,
+    "why": "色が違うと判定（色の差 0.80・合格は0.55以下）"
+   },
+   {
+    "name": "SAINT LAURENT PARIS/エディ期/チェックテーラージャケット",
+    "price": 99000,
+    "url": "https://jp.mercari.com/item/m80863414261",
+    "image": "https://static.mercdn.net/thumb/item/webp/m80863414261_1.jpg?1779785439",
+    "sim_look": 0.853,
+    "sim_same": 0.932,
+    "why": "色が違うと判定（色の差 0.92・合格は0.55以下）"
+   },
+   {
+    "name": "極美品 サンローラン　15AW 霜降り テーラードジャケット 44",
+    "price": 75000,
+    "url": "https://jp.mercari.com/item/m19960890049",
+    "image": "https://static.mercdn.net/thumb/item/webp/m19960890049_1.jpg?1782568565",
+    "sim_look": 0.863,
+    "sim_same": 0.924,
+    "why": "色が違うと判定（色の差 0.84・合格は0.55以下）"
+   },
+   {
+    "name": "saint laurent スモーキングジャケット セットアップ タキシード",
+    "price": 99000,
+    "url": "https://jp.mercari.com/item/m69261008295",
+    "image": "https://static.mercdn.net/thumb/item/webp/m69261008295_1.jpg?1785066136",
+    "sim_look": 0.859,
+    "sim_same": 0.922,
+    "why": "形の一致点 0点（合格10点）・AI判定「不明」75点：ラペルの形状とボタンの数が異なるため、同一の商品ではないと判断する。"
+   }
+  ]
+ },
+ {
+  "shop": "KINDAL",
+  "brand": "Saint Laurent",
+  "title": "16AWエディ期 D02 M SK-LWダメージ加工スキニーデニムパンツ441240",
+  "price": 14630,
+  "url": "https://shop.kind.co.jp/products/8071000186690",
+  "image": "https://cdn.shopify.com/s/files/1/0585/3010/3347/files/8071000186690_1.jpg?v=1792141872",
+  "estimate": 25250,
+  "profit": 7295,
+  "confidence": "高",
+  "count": 28,
+  "eye": "新",
+  "candidates": [
+   {
+    "name": "ベ*ー様 saint laurent paris",
+    "price": 23100,
+    "url": "https://jp.mercari.com/item/m24814199950",
+    "image": "https://static.mercdn.net/thumb/item/webp/m24814199950_1.jpg?1721467135",
+    "sim_look": 0.86,
+    "sim_same": 0.954,
+    "why": "色が違うと判定（色の差 0.76・合格は0.55以下）"
+   },
+   {
+    "name": "o*s様 SAINT LAURENT 16AWエディ期 デストロイ クラッシュデ",
+    "price": 35000,
+    "url": "https://jp.mercari.com/item/m99688976904",
+    "image": "https://static.mercdn.net/thumb/item/webp/m99688976904_1.jpg?1793537303",
+    "sim_look": 0.859,
+    "sim_same": 0.94,
+    "why": "色が違うと判定（色の差 0.82・合格は0.55以下）"
+   },
+   {
+    "name": "希少13SSサンローランパリ D02 エディ期 スキニーデニム 29 グッチタグ",
+    "price": 50000,
+    "url": "https://jp.mercari.com/item/m53346477501",
+    "image": "https://static.mercdn.net/thumb/item/webp/m53346477501_1.jpg?1786868874",
+    "sim_look": 0.866,
+    "sim_same": 0.914,
+    "why": "色が違うと判定（色の差 0.56・合格は0.55以下）"
+   },
+   {
+    "name": "SAINT LAURENT エディ期　膝クラッシュデニム　フルレングス",
+    "price": 25000,
+    "url": "https://jp.mercari.com/item/m85996363395",
+    "image": "https://static.mercdn.net/thumb/item/webp/m85996363395_1.jpg?1790493225",
+    "sim_look": 0.867,
+    "sim_same": 0.913,
+    "why": "色が違うと判定（色の差 0.58・合格は0.55以下）"
+   },
+   {
+    "name": "名作 SAINT LAURENT エディ期 D02 デストロイ スキニー デニム",
+    "price": 34000,
+    "url": "https://jp.mercari.com/item/m86392506183",
+    "image": "https://static.mercdn.net/thumb/item/webp/m86392506183_1.jpg?1775297044",
+    "sim_look": 0.862,
+    "sim_same": 0.907,
+    "why": "色が違うと判定（色の差 0.83・合格は0.55以下）"
+   }
+  ]
+ },
+ {
+  "shop": "KINDAL",
+  "brand": "Saint Laurent",
+  "title": "エディ期テディジャケット508862 Y170S",
+  "price": 74844,
+  "url": "https://shop.kind.co.jp/products/8004001967548",
+  "image": "https://cdn.shopify.com/s/files/1/0585/3010/3347/files/8004001967548_1_e0bd58c8-1b60-4d04-b821-4831b0e5c3f3.jpg?v=1789986079",
+  "estimate": 110000,
+  "profit": 23356,
+  "confidence": "中",
+  "count": 5,
+  "eye": "新",
+  "candidates": [
+   {
+    "name": "SAINT LAURENT サンローラン　テディジャケット　スタジャン",
+    "price": 75537,
+    "url": "https://jp.mercari.com/item/m29559778236",
+    "image": "https://static.mercdn.net/thumb/item/webp/m29559778236_1.jpg?1777387809",
+    "sim_look": 0.854,
+    "sim_same": 0.901,
+    "why": "色が違うと判定（色の差 0.82・合格は0.55以下）"
+   },
+   {
+    "name": "正規品 SAINT LAURENT サンローラン テディジャケット 54",
+    "price": 110000,
+    "url": "https://jp.mercari.com/item/m33068069873",
+    "image": "https://static.mercdn.net/thumb/item/webp/m33068069873_1.jpg?1763174747",
+    "sim_look": 0.854,
+    "sim_same": 0.876,
+    "why": "色が違うと判定（色の差 0.83・合格は0.55以下）"
+   },
+   {
+    "name": "saint laurent paris スタジャン　テディジャケット　42",
+    "price": 130000,
+    "url": "https://jp.mercari.com/item/m92515261557",
+    "image": "https://static.mercdn.net/thumb/item/webp/m92515261557_1.jpg?1738400369",
+    "sim_look": 0.865,
+    "sim_same": 0.874,
+    "why": "色が違うと判定（色の差 0.76・合格は0.55以下）"
+   },
+   {
+    "name": "Saint Laurent テディジャケット 46サイズ",
+    "price": 110000,
+    "url": "https://jp.mercari.com/item/m57576077420",
+    "image": "https://static.mercdn.net/thumb/item/webp/m57576077420_1.jpg?1770398286",
+    "sim_look": 0.863,
+    "sim_same": 0.863,
+    "why": "色が違うと判定（色の差 0.62・合格は0.55以下）"
+   },
+   {
+    "name": "わんこ様専用　サンローランテディジャケット",
+    "price": 60200,
+    "url": "https://jp.mercari.com/item/m26884554853",
+    "image": "https://static.mercdn.net/thumb/item/webp/m26884554853_1.jpg?1777551255",
+    "sim_look": 0.851,
+    "sim_same": 0.836,
+    "why": "色が違うと判定（色の差 0.87・合格は0.55以下）"
+   }
+  ]
+ },
+ {
+  "shop": "KINDAL",
+  "brand": "Saint Laurent",
+  "title": "ピークドラペル1Bジャケット",
+  "price": 50094,
+  "url": "https://shop.kind.co.jp/products/8045001381699",
+  "image": "https://cdn.shopify.com/s/files/1/0585/3010/3347/files/8045001381699_1.jpg?v=1785129076",
+  "estimate": 99000,
+  "profit": 38206,
+  "confidence": "低",
+  "count": 1,
+  "eye": "新",
+  "candidates": [
+   {
+    "name": "saint laurent スモーキングジャケット セットアップ タキシード",
+    "price": 99000,
+    "url": "https://jp.mercari.com/item/m69261008295",
+    "image": "https://static.mercdn.net/thumb/item/webp/m69261008295_1.jpg?1785066136",
+    "sim_look": 0.85,
+    "sim_same": 0.872,
+    "why": "色が違うと判定（色の差 0.93・合格は0.55以下）"
+   }
+  ]
+ },
+ {
+  "shop": "BRING",
+  "brand": "Saint Laurent",
+  "title": "YVES SAINT LAURENT(イヴサンローラン) ラムレザー ダブルライダース ジャケット ブラック レディース 605742",
+  "price": 121000,
+  "url": "https://wastenot-official.com/products/4026k070036",
+  "image": "https://cdn.shopify.com/s/files/1/0699/7462/2265/files/4026k070036-1.jpg?v=1795174430",
+  "estimate": 159000,
+  "profit": 21300,
+  "confidence": "低",
+  "count": 3,
+  "eye": "新",
+  "candidates": [
+   {
+    "name": "クラシック ダブルライダースジャケット ブラック",
+    "price": 159000,
+    "url": "https://jp.mercari.com/item/m83349878775",
+    "image": "https://static.mercdn.net/thumb/item/webp/m83349878775_1.jpg?1787634645",
+    "sim_look": 0.873,
+    "sim_same": 0.888,
+    "why": "形の一致点 6点（合格10点）・AI判定「違う」20点：両者は同じブランドのダブルライダースジャケットでカラーも一致していますが、細部のデザインが多数異なるため、同一の型の商品ではありません。"
+   },
+   {
+    "name": "SAINT LAURENT L01 オールブラックモデル　44 エディ期",
+    "price": 200000,
+    "url": "https://jp.mercari.com/item/m35826835334",
+    "image": "https://static.mercdn.net/thumb/item/webp/m35826835334_1.jpg?1773400824",
+    "sim_look": 0.858,
+    "sim_same": 0.822,
+    "why": "色が違うと判定（色の差 0.95・合格は0.55以下）"
+   },
+   {
+    "name": "価格変更しました。SAINT LAURENT ブラックレザージャケット48",
+    "price": 220000,
+    "url": "https://jp.mercari.com/item/m98410288519",
+    "image": "https://static.mercdn.net/thumb/item/webp/m98410288519_1.jpg?1770525346",
+    "sim_look": 0.863,
+    "sim_same": 0.769,
+    "why": "色が違うと判定（色の差 0.61・合格は0.55以下）"
+   }
+  ]
+ },
+ {
+  "shop": "BRING",
+  "brand": "Saint Laurent",
+  "title": "SAINT LAURENT PARIS(サンローランパリ) クラッシュ加工 スキニー デニムパンツ トラウザーライトインディゴ 597052 YM372",
+  "price": 15290,
+  "url": "https://wastenot-official.com/products/8726h140010",
+  "image": "https://cdn.shopify.com/s/files/1/0699/7462/2265/files/8726H140010-1.jpg?v=1787536024",
+  "estimate": 21250,
+  "profit": 3035,
+  "confidence": "高",
+  "count": 30,
+  "eye": "新",
+  "candidates": [
+   {
+    "name": "ATTACHMENT ダメージスキニーデニム",
+    "price": 4800,
+    "url": "https://jp.mercari.com/item/m63516286491",
+    "image": "https://static.mercdn.net/thumb/item/webp/m63516286491_1.jpg?1782227702",
+    "sim_look": 0.875,
+    "sim_same": 0.947,
+    "why": "形の一致点 0点（合格10点）・AI判定「違う」0点：商品Aと商品Bは、ブランドが異なるため、同一の型で同一のカラー展開の商品ではありません。"
+   },
+   {
+    "name": "サンローラン　デニム　32",
+    "price": 24000,
+    "url": "https://jp.mercari.com/item/m28122096007",
+    "image": "https://static.mercdn.net/thumb/item/webp/m28122096007_1.jpg?1728613530",
+    "sim_look": 0.865,
+    "sim_same": 0.945,
+    "why": "色が違うと判定（色の差 0.73・合格は0.55以下）"
+   },
+   {
+    "name": "SAINT LAURENT PARIS D02 M/SK-LW デニムパンツ30",
+    "price": 17500,
+    "url": "https://jp.mercari.com/item/m53643809436",
+    "image": "https://static.mercdn.net/thumb/item/webp/m53643809436_1.jpg?1786255105",
+    "sim_look": 0.861,
+    "sim_same": 0.944,
+    "why": "色が違うと判定（色の差 0.74・合格は0.55以下）"
+   },
+   {
+    "name": "サンローラン　スキニーデニム　エディ期",
+    "price": 15900,
+    "url": "https://jp.mercari.com/item/m95392825770",
+    "image": "https://static.mercdn.net/thumb/item/webp/m95392825770_1.jpg?1774969627",
+    "sim_look": 0.862,
+    "sim_same": 0.941,
+    "why": "色が違うと判定（色の差 0.57・合格は0.55以下）"
+   },
+   {
+    "name": "SAINT LAURENT フレアデニム　archive y2k ストレート",
+    "price": 25000,
+    "url": "https://jp.mercari.com/item/m15999873721",
+    "image": "https://static.mercdn.net/thumb/item/webp/m15999873721_1.jpg?1792205701",
+    "sim_look": 0.85,
+    "sim_same": 0.936,
+    "why": "色が違うと判定（色の差 0.64・合格は0.55以下）"
+   }
+  ]
+ },
+ {
+  "shop": "BRING",
+  "brand": "Saint Laurent",
+  "title": "SAINT LAURENT PARIS(サンローランパリ) D24 M/SK-MW ウォッシュ加工 レザーロゴパッチ ジップフライ デニムスキニーパンツ ブラック 622876 Y500R",
+  "price": 11990,
+  "url": "https://wastenot-official.com/products/9026g200057",
+  "image": "https://cdn.shopify.com/s/files/1/0699/7462/2265/files/9026G200057-1.jpg?v=1785201494",
+  "estimate": 17549,
+  "profit": 3004,
+  "confidence": "中",
+  "count": 6,
+  "eye": "新",
+  "candidates": [
+   {
+    "name": "サンローラン ブラックデニム スキニー ジーンズ 30",
+    "price": 14800,
+    "url": "https://jp.mercari.com/item/m21506119719",
+    "image": "https://static.mercdn.net/thumb/item/webp/m21506119719_1.jpg?1782193041",
+    "sim_look": 0.874,
+    "sim_same": 0.896,
+    "why": "色が違うと判定（色の差 0.86・合格は0.55以下）"
+   },
+   {
+    "name": "2*m様 【12/31まで】SAINT LAURENT ブラックスキニーデニム",
+    "price": 15099,
+    "url": "https://jp.mercari.com/item/m26282477224",
+    "image": "https://static.mercdn.net/thumb/item/webp/m26282477224_1.jpg?1765713949",
+    "sim_look": 0.859,
+    "sim_same": 0.885,
+    "why": "色が違うと判定（色の差 0.71・合格は0.55以下）"
+   },
+   {
+    "name": "中古 サンローラン フレアデニム ブラック サイズ32",
+    "price": 21000,
+    "url": "https://jp.mercari.com/item/m74338856531",
+    "image": "https://static.mercdn.net/thumb/item/webp/m74338856531_1.jpg?1771246079",
+    "sim_look": 0.854,
+    "sim_same": 0.883,
+    "why": "色が違うと判定（色の差 0.67・合格は0.55以下）"
+   },
+   {
+    "name": "H&M EDITION ブラックデニムパンツ W29",
+    "price": 3000,
+    "url": "https://jp.mercari.com/item/m58918030310",
+    "image": "https://static.mercdn.net/thumb/item/webp/m58918030310_1.jpg?1757983059",
+    "sim_look": 0.875,
+    "sim_same": 0.852,
+    "why": "色が違うと判定（色の差 0.67・合格は0.55以下）"
+   },
+   {
+    "name": "Saint Laurent ブラック　スキニーデニム　ジーンズ　W31",
+    "price": 25000,
+    "url": "https://jp.mercari.com/item/m29938999152",
+    "image": "https://static.mercdn.net/thumb/item/webp/m29938999152_1.jpg?1766316882",
+    "sim_look": 0.865,
+    "sim_same": 0.848,
+    "why": "色が違うと判定（色の差 0.75・合格は0.55以下）"
+   }
+  ]
+ },
+ {
+  "shop": "BRING",
+  "brand": "Saint Laurent",
+  "title": "SAINT LAURENT PARIS(サンローランパリ) Lambskin MA-1 Bomber Jacket ラムスキン ボンバージャケット レザー ブルゾン ブラック 500952 YCBX2",
+  "price": 155248,
+  "url": "https://wastenot-official.com/products/1626j030020",
+  "image": "https://cdn.shopify.com/s/files/1/0699/7462/2265/files/1626J030020-1.jpg?v=1792379086",
+  "estimate": 210000,
+  "profit": 32952,
+  "confidence": "低",
+  "count": 1,
+  "eye": "新",
+  "candidates": [
+   {
+    "name": "サンローランパリ ラムレザー ボンバージャケット ブルゾン ブラック 52",
+    "price": 210000,
+    "url": "https://jp.mercari.com/item/m66673732504",
+    "image": "https://static.mercdn.net/thumb/item/webp/m66673732504_1.jpg?1739941670",
+    "sim_look": 0.894,
+    "sim_same": 0.886,
+    "why": "色が違うと判定（色の差 0.80・合格は0.55以下）"
+   }
+  ]
+ },
+ {
+  "shop": "RINKAN",
+  "brand": "Saint Laurent",
+  "title": "ドットウェスタン長袖シャツ",
+  "price": 14740,
+  "url": "https://rinkan-online.com/products/10312-261116-0319",
+  "image": "https://cdn.rinkan-online.com/images/10312-261116-0319_1.jpg",
+  "estimate": 20100,
+  "profit": 2550,
+  "confidence": "低",
+  "count": 2,
+  "eye": "新",
+  "candidates": [
+   {
+    "name": "な*ん様 サンローラン パリ スター ドット シャツ L",
+    "price": 20100,
+    "url": "https://jp.mercari.com/item/m61992276015",
+    "image": "https://static.mercdn.net/thumb/item/webp/m61992276015_1.jpg?1783510856",
+    "sim_look": 0.878,
+    "sim_same": 0.947,
+    "why": "色が違うと判定（色の差 0.88・合格は0.55以下）"
+   },
+   {
+    "name": "20ss Saint Laurent ドット ウエスタン 長袖シャツ",
+    "price": 23800,
+    "url": "https://jp.mercari.com/item/m87975803547",
+    "image": "https://static.mercdn.net/thumb/item/webp/m87975803547_1.jpg?1791893051",
+    "sim_look": 0.887,
+    "sim_same": 0.898,
+    "why": "色が違うと判定（色の差 0.58・合格は0.55以下）"
+   }
+  ]
+ },
+ {
+  "shop": "オフモール",
+  "brand": "Undercover",
+  "title": "UNDERCOVER シフォン切替スウェット",
+  "price": 9900,
+  "url": "https://netmall.hardoff.co.jp/product/6571591/",
+  "image": "https://p1-d9ebd2ee.imageflux.jp/c!/w=231,h=182,a=0,u=0,q=75/104004/2026_09_27_14_42_30.jpg",
+  "estimate": 15000,
+  "profit": 2800,
+  "confidence": "低",
+  "count": 1,
+  "eye": "新",
+  "candidates": [
+   {
+    "name": "UNDERCOVER ウールカシミヤスウェット",
+    "price": 15000,
+    "url": "https://jp.mercari.com/item/m55969766383",
+    "image": "https://static.mercdn.net/thumb/item/webp/m55969766383_1.jpg?1780646541",
+    "sim_look": 0.902,
+    "sim_same": 0.769,
+    "why": "形の一致点 0点（合格10点）・AI判定「違う」20点：ブランド、アイテムの種類、カラーは共通していますが、デザインの型が異なるため、同一商品ではないと判断します。"
+   }
+  ]
+ },
+ {
+  "shop": "オフモール",
+  "brand": "Undercover",
+  "title": "UNDERCOVER スタジャン",
+  "price": 39600,
+  "url": "https://netmall.hardoff.co.jp/product/6476722/",
+  "image": "https://p1-d9ebd2ee.imageflux.jp/c!/w=231,h=182,a=0,u=0,q=75/203240/2026_08_26_10_17_30.jpg",
+  "estimate": 148000,
+  "profit": 92800,
+  "confidence": "低",
+  "count": 1,
+  "eye": "新",
+  "candidates": [
+   {
+    "name": "UNDERCOVER 2025 スポットアイテム　復刻スタジャン",
+    "price": 148000,
+    "url": "https://jp.mercari.com/item/m62809728798",
+    "image": "https://static.mercdn.net/thumb/item/webp/m62809728798_1.jpg?1793802968",
+    "sim_look": 0.875,
+    "sim_same": 0.835,
+    "why": "色が違うと判定（色の差 0.87・合格は0.55以下）"
+   }
+  ]
+ }
+]
