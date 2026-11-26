@@ -1,9 +1,8 @@
 # メルカリ内 仕入れスキャン（販売中の商品を相場DBと照合して掘り出し物を探す）
 name: メルカリ内スキャン
 
+# 【一時停止中 2026-11-27】持ち主の依頼で利益さがしを止めています。再開するときは、この下の自動実行(schedule)と、ジョブの「if: false」を元に戻す
 on:
-  schedule:
-    - cron: "0 3 * * *" # 毎日1回・03:00 UTC = 日本時間 12:00
   workflow_dispatch:
     inputs:
       targets:
@@ -16,6 +15,7 @@ permissions:
 
 jobs:
   scan:
+    if: ${{ false }} # 一時停止中（2026-11-27）
     runs-on: ubuntu-latest
     timeout-minutes: 180
     steps:

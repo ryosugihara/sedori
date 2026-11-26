@@ -2,12 +2,8 @@
 # 利益が出そうな商品を1回だけ探して通知（新着監視とは別。手動で実行する棚卸し用）
 name: 在庫スキャン(利益さがし)
 
+# 【一時停止中 2026-11-27】持ち主の依頼で利益さがしを止めています。再開するときは、この下の自動実行(schedule)と、ジョブの「if: false」を元に戻す
 on:
-  schedule:
-    - cron: "30 3 * * *" # 毎日1回・03:30 UTC = 日本時間 12:30（メルカリ内スキャンの後）
-  push: # この設定ファイルを変えた時にも1回実行する（動作確認用）
-    paths:
-      - ".github/workflows/scan-profit.yml"
   workflow_dispatch: # 手動でも実行できる
     inputs:
       scan_max:
@@ -20,6 +16,7 @@ permissions:
 
 jobs:
   scan:
+    if: ${{ false }} # 一時停止中（2026-11-27）
     runs-on: ubuntu-latest
     timeout-minutes: 180 # 精度重視で1件ごとの照合(候補5件+AI確認)が重くなり90分では
                          # 全在庫を見切れず打ち切られたため延長(メルカリ内スキャンと同じ)

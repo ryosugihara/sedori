@@ -3,11 +3,8 @@
 # 対象ブランドは watch_mercari.json の『優先スキャンのブランド』で決める
 name: メルカリ優先スキャン
 
+# 【一時停止中 2026-11-27】持ち主の依頼で利益さがしを止めています。再開するときは、この下の自動実行(schedule)と、ジョブの「if: false」を元に戻す
 on:
-  schedule:
-    # 自動再起動チェーン(PAT)が途切れた時だけの保険。KINDAL新着監視(monitor.yml)と
-    # 同じ理由でループより長い間隔にする（30分毎だと5時間ループの最中に必ず衝突する）。
-    - cron: "0 */6 * * *" # 6時間ごと
   workflow_dispatch:
     inputs:
       loop_minutes:
@@ -25,6 +22,7 @@ concurrency:
 
 jobs:
   scan:
+    if: ${{ false }} # 一時停止中（2026-11-27）
     runs-on: ubuntu-latest
     timeout-minutes: 360 # 安全のための最大時間（6時間）
     steps:
