@@ -321,6 +321,8 @@ def load_souba():
         "v2_strong_d": s.get("新しい目_同デザイン_DINO", 0.85),
         "v2_cand_s": s.get("新しい目_似た系統_SigLIP", 0.85),
         "v2_cand_d": s.get("新しい目_似た系統_DINO", 0.75),
+        # サイズを考えて相場を出すか（同じサイズ区分で売れた実例だけで相場を出す）
+        "size_aware": s.get("相場_サイズを考える", True),
         # 画像判定の対象外・照合条件（無地は判定しない／属性語は名前の一致が必要）
         "plain_cats": s.get("画像判定_無地カテゴリ", []),
         "feature_words": s.get("画像判定_特徴語", []),
@@ -407,6 +409,9 @@ def profit_lines(item, souba):
                 f"強気¥{m['price_strong']:,}"
                 f"（根拠{m['count']}件{outl}・信頼度{conf_mark}{conf}）"
             )
+        if m.get("size_note"):
+            st = f"サイズ {m['size']}・" if m.get("size") else ""
+            lines.append(f"📏 {st}{m['size_note']}")
         lines.append(f"🎯 判定相場 ¥{m['estimate']:,} → 手取り ¥{m['net']:,}")
         if m["profit"] is not None:
             lines.append(f"💰 予想利益 約¥{m['profit']:,}")
@@ -766,8 +771,16 @@ def write_scan_diagnostics(path, total_fetched, examined, stats, sent_count):
         lines.append("11. 最終確認（色比較・幾何検証・AI）の内訳（候補ごとの回数）:")
         for name, n in finals:
             lines.append(f"   ・{name}: {n} 回")
+    if any(k.startswith("size_") for k in stats):
+        lines.append(
+            "12. サイズを考えた相場（利益が出そうな候補のみ）: "
+            f"同じサイズの実例で計算 {stats.get('size_同サイズで計算', 0)} 件 / "
+            f"同じサイズの実例なし(最安値で計算) {stats.get('size_同サイズの実例なし', 0)} 件 / "
+            f"サイズ不明 {stats.get('size_不明', 0)} 件 → "
+            f"サイズを考えたら利益不足で落ちた {stats.get('reason_利益不足_サイズ考慮で下がった', 0)} 件"
+        )
 
-    report = "\n".join(lines)
+    report ="\n".join(lines)
     os.makedirs("せどり/データ/recon", exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         f.write(report)

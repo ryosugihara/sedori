@@ -393,6 +393,49 @@ def match_item(item, souba, stats=None, min_profit=None):
         if min_profit is not None and profit is not None and profit < min_profit:
             return None
 
+        # ---- サイズを考えて相場を出し直す（2026-11-26 依頼）----
+        # 同じデザインでもサイズで売れる値段が大きく違う（34のような小さいサイズは安い）。
+        # 全サイズの売却例で出した相場で『利益が出そう』となった商品だけ、お店の商品の
+        # サイズを調べ（必要なら商品ページを1回読む）、メルカリで同じサイズ区分で売れた
+        # 実例だけで相場を出し直す。同じ区分が2件未満なら となりの区分も使い、
+        # それでも無ければ全サイズの最安値で控えめに判定する。
+        size_text = size_bucket = size_note = None
+        if souba.get("size_aware", True):
+            try:
+                import item_size
+                size_text = item_size.size_text_of(item)
+                size_bucket = item_size.to_bucket(size_text, item)
+            except Exception as e:
+                print(f"  サイズ判定エラー: {e}")
+            if size_bucket:
+                pool_all = ordered[:int(souba.get("size_pool_max", 120))]
+                same = [i for i in pool_all if (rs[i][4] or "") == size_bucket]
+                used, label = same, "同じサイズ"
+                if len(same) < 2:
+                    near = set(item_size.neighbors(size_bucket))
+                    used = same + [i for i in pool_all if (rs[i][4] or "") in near]
+                    label = "同じ/となりのサイズ"
+                if len(used) >= 2:
+                    pm2 = price_model([rs[i][2] for i in used[:int(souba.get("price_pool", 30))]], souba)
+                    if pm2:
+                        pm = pm2
+                        size_note = f"{label}（{size_bucket}）で売れた{len(used)}件で計算"
+                        _count("size_同サイズで計算")
+                else:
+                    cheapest = min(int(rs[i][2]) for i in pool if rs[i][2])
+                    pm = dict(pm, estimate=cheapest, confidence="低")
+                    size_note = f"サイズ{size_bucket}の売却例が無いため、全サイズの最安値で計算"
+                    _count("size_同サイズの実例なし")
+                estimate = pm["estimate"]
+                net = int(estimate * (1 - fee) - ship)
+                profit = (net - buy) if buy else None
+            else:
+                size_note = "サイズ不明（全サイズの売却例で計算）"
+                _count("size_不明")
+            if min_profit is not None and profit is not None and profit < min_profit:
+                _count("reason_利益不足_サイズ考慮で下がった")
+                return None
+
         # 通知する実例は必ず答え合わせに合格した物だけにする（二重確認）:
         #  1) 幾何検証（無料）… 細部の点が同じ位置関係で一致するか
         #  2) AI最終確認（カギがある時だけ）… AIが写真2枚を見比べて判定
@@ -510,10 +553,12 @@ def match_item(item, souba, stats=None, min_profit=None):
                     "profit": profit,
                     "confidence": pm["confidence"],
                     "count": pm["n_used"],
+                    "size": size_text, "size_bucket": size_bucket, "size_note": size_note,
                     "eye": "新" if v2 else "旧",
                     "candidates": [{
                         "name": rs[ci][1] or "",
                         "price": rs[ci][2],
+                        "size": rs[ci][4] or "",
                         "url": f"https://jp.mercari.com/item/{rs[ci][0]}",
                         "image": rs[ci][5],
                         "sim_look": round(float(sims_c[ci]), 3),
@@ -549,6 +594,10 @@ def match_item(item, souba, stats=None, min_profit=None):
             "ref_price": r0[2],
             "ref_url": f"https://jp.mercari.com/item/{r0[0]}",
             "ref_image": r0[5],  # 実例の写真URL（通知で店の写真と並べて見せる）
+            "ref_size": r0[4] or "",
+            "size": size_text,          # お店の商品のサイズ（表記のまま）
+            "size_bucket": size_bucket,  # メルカリのサイズ区分にそろえた物
+            "size_note": size_note,      # 相場をどのサイズの実例で出したか
         }
     except Exception as e:
         print(f"  画像照合エラー: {e}")
