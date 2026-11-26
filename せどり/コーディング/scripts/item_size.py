@@ -144,7 +144,7 @@ def to_bucket(size_text, item=None):
         return b
     if re.search(r"free|フリー|f$", first, re.I):
         return "FREE SIZE"
-    m = re.match(r"^[Ww]?(\d{1,2})(?:\.\d)?$", first)
+    m = re.match(r"^[Ww]?(\d{1,2})(?:\.\d)?(インチ|inch|in|号)?$", first, re.I)
     if not m:
         return None
     n = int(m.group(1))
