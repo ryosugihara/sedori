@@ -74,6 +74,8 @@ ALLU_STATE_FILE = "せどり/データ/state/allu_seen.json"  # ALLU の「見�
 RAGTAG_BRANDS_FILE = "せどり/データ/watchlists/watch_ragtag.json"  # RAGTAG の見張るブランド一覧
 RAGTAG_STATE_FILE = "せどり/データ/state/ragtag_seen.json"  # RAGTAG の「見た商品」記録
 
+# 実際の監視の速さの記録（設定どおりの間隔で見られているかを確かめるため。30分ごとに更新）
+SPEED_FILE = "せどり/データ/state/monitor_speed.json"
 SCAN_PROFIT_SEEN_FILE = "せどり/データ/state/scan_profit_seen.json"  # 在庫スキャンで送信済みの商品記録(重複通知防止)
 SCAN_PROFIT_REPORT_FILE = "せどり/データ/recon/SCAN_PROFIT.txt"  # 送信した商品名・金額・リンクの記録(あとで見返す用)
 SCAN_PROFIT_STATS_FILE = "せどり/データ/recon/SCAN_PROFIT_STATS.txt"  # 「なぜ通知に至らなかったか」の診断レポート
@@ -1121,6 +1123,65 @@ def main():
             return RINKAN_WINDOW_SECONDS
         return POLL_SECONDS
 
+    # ---- 実際の速さの記録（2026-11-28 依頼「本当にその速度で監視していますか」）----
+    # 店ごとに『同じ仕事を前回見てから何秒たったか（実際の間隔）』と『1回の所要時間』を測り、
+    # 30分ごとに state/monitor_speed.json に書いてサーバーに保存する。
+    # 設定の間隔より実際の間隔が長ければ、どこかで待たされている（新着の画像照合など）。
+    SPEED_SAVE_SECONDS = int(os.environ.get("SPEED_SAVE_SECONDS", "1800"))
+    speed = {"started": time.time(), "last_start": {}, "gaps": {}, "durs": {}, "target": {},
+             "slowest": [], "saved": time.time()}
+
+    def timed(site, key, target, fn):
+        t0 = time.time()
+        prev = speed["last_start"].get(key)
+        if prev is not None:
+            speed["gaps"].setdefault(site, []).append(t0 - prev)
+        speed["last_start"][key] = t0
+        speed["target"][site] = target
+        try:
+            return fn()
+        finally:
+            d = time.time() - t0
+            speed["durs"].setdefault(site, []).append(d)
+            if d >= 15:
+                speed["slowest"].append((round(d, 1), site, time.strftime(
+                    "%m/%d %H:%M", time.gmtime(t0 + 9 * 3600))))
+                speed["slowest"] = sorted(speed["slowest"], reverse=True)[:10]
+
+    def save_speed(final=False):
+        def q(xs, p):
+            xs = sorted(xs)
+            return round(xs[min(len(xs) - 1, int(len(xs) * p))], 1) if xs else None
+        sites = {}
+        for site in sorted(set(speed["gaps"]) | set(speed["durs"])):
+            g, d = speed["gaps"].get(site, []), speed["durs"].get(site, [])
+            sites[site] = {
+                "設定の間隔(秒)": speed["target"].get(site),
+                "実際の間隔_ふつう(秒)": q(g, 0.5),
+                "実際の間隔_遅い時(上位10%)(秒)": q(g, 0.9),
+                "実際の間隔_最長(秒)": round(max(g), 1) if g else None,
+                "1回の所要_ふつう(秒)": q(d, 0.5),
+                "1回の所要_最長(秒)": round(max(d), 1) if d else None,
+                "チェック回数": len(d),
+            }
+        out = {
+            "更新": time.strftime("%Y-%m-%d %H:%M", time.gmtime(time.time() + 9 * 3600)) + " (日本時間)",
+            "この回の開始": time.strftime("%m/%d %H:%M", time.gmtime(speed["started"] + 9 * 3600)),
+            "この回の終了済み": final,
+            "説明": "『実際の間隔』は、同じ店・同じブランドを前回見てから次に見るまでの秒数。"
+                    "高山質店はお店の許可どおり10分に1回だけ読み、間は前回の結果を使う。"
+                    "『15秒以上かかったチェック』は、新着の画像照合などで監視が止まっていた時間。",
+            "店ごと": sites,
+            "15秒以上かかったチェック": [
+                {"秒": s, "店": site, "時刻": t} for s, site, t in speed["slowest"]],
+        }
+        try:
+            with open(SPEED_FILE, "w", encoding="utf-8") as f:
+                json.dump(out, f, ensure_ascii=False, indent=1)
+        except Exception as e:
+            print(f"  速さの記録の保存に失敗: {e}")
+        speed["saved"] = time.time()
+
     now0 = time.time()
     next_run = {"kindal": now0 + KINDAL_SECONDS, "kindal_full": now0 + SLOW_SECONDS}
     for j, t in enumerate(other_tasks):
@@ -1130,27 +1191,38 @@ def main():
     # 決めた時間内は、くり返しチェックし続ける（2回目以降は初回扱いしない）
     while time.time() < end_time:
         now = time.time()
+        # 30分ごとに実際の速さを記録してサーバーに保存（忙しくて休みが無い時も必ず通る場所）
+        if now - speed["saved"] >= SPEED_SAVE_SECONDS:
+            save_speed()
+            git_save_state()
         try:
             # ① KINDAL 1ページ目（最優先）
             if now >= next_run["kindal"]:
                 next_run["kindal"] = now + KINDAL_SECONDS
                 # 同じKINDALへ3回続けて読みに行くので、間は0.3秒だけ空ける
-                handle(check_source(kindal_brands, kindal_seen, False, kindal_items_newest, True,
-                                    wait=0.3))
+                handle(timed("KINDAL(1ページ目)", "kindal", KINDAL_SECONDS,
+                             lambda: check_source(kindal_brands, kindal_seen, False,
+                                                  kindal_items_newest, True, wait=0.3)))
                 continue
             # ② KINDAL 全ページ（1ページ目より後ろに新着が紛れた時の保険）
             if now >= next_run["kindal_full"]:
                 next_run["kindal_full"] = now + SLOW_SECONDS
-                handle(check_source(kindal_brands, kindal_seen, False, kindal_items, True))
+                handle(timed("KINDAL(全ページ)", "kindal_full", SLOW_SECONDS,
+                             lambda: check_source(kindal_brands, kindal_seen, False,
+                                                  kindal_items, True)))
                 continue
             # ③ 他の店：期限が来た仕事のうち、一番待っているもの1つだけ
             due = [t for t in other_tasks if now >= next_run[t[0]]]
             if due:
                 key, site, b, seen_, getter = min(due, key=lambda t: next_run[t[0]])
                 # RINKANの時間帯に入った瞬間から短い間隔に切り替わるよう、次回を先に決める
-                next_run[key] = now + task_interval(site, b, now)
+                iv = task_interval(site, b, now)
+                next_run[key] = now + iv
                 # 1ブランドだけの仕事なので、ブランド後の待ちは不要（仕事の間隔がサイトへの間隔）
-                handle(check_source([b], seen_, False, getter, True, wait=0))
+                label = site + ("(RINKAN時間帯)" if site == "RINKAN" and iv == RINKAN_WINDOW_SECONDS
+                                else "(②ゆっくり)" if iv == SLOW_SECONDS else "")
+                handle(timed(label, key + label, iv,
+                             lambda: check_source([b], seen_, False, getter, True, wait=0)))
                 continue
         except Exception as e:
             # 1つの仕事の失敗で監視全体を止めない
@@ -1161,6 +1233,7 @@ def main():
 
     # 最後に記録を保存して終了（次の見張りが続きから始められる）
     save_all()
+    save_speed(final=True)
     git_save_state()
     print("ループ監視 終了")
 
