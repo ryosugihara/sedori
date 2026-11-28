@@ -19,7 +19,9 @@ import re
 import json
 import time
 import subprocess
+import threading
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 import urllib.error
 import urllib.parse
 
@@ -83,6 +85,25 @@ SOUBA_FILE = "せどり/データ/watchlists/souba.json"                    # �
 EXCLUDE_FILE = "せどり/データ/watchlists/exclude.json"                # 通知から除外する条件
 PER_PAGE = 250                        # 1回の取得件数（Shopifyの最大値）
 MAX_PAGES = 20                        # 安全のための上限（無限ループ防止）
+# KINDALの新着チェックで、各売り場の先頭から何件を見るか（新着は先頭に並ぶ。
+# 数秒ごとに見るので少なくて足りる。250件全部を毎回読むより、お店への負担も軽い）
+KINDAL_NEWEST_LIMIT = int(os.environ.get("KINDAL_NEWEST_LIMIT", "50"))
+# KINDALは専用の見張り役(スレッド)で、他の店と同時に動かす。共有する記録の読み書き・
+# 画像照合(AI)がぶつからないようにする鍵
+STATE_LOCK = threading.RLock()   # 見た記録の更新・保存・サーバー保存
+MATCH_LOCK = threading.Lock()    # 画像照合（AIの部品は1つずつ使う）
+_fast_sent_total = [0]           # 速報で送った件数（保存のきっかけに使う）
+# KINDALの新着の写真照合をする裏の係（1人）。見張り役は照合を待たずに次のチェックへ戻る
+_match_pool = ThreadPoolExecutor(max_workers=1)
+
+
+def _bg_decide(decide, it):
+    """裏の係の仕事: 照合して、速報済みならカードを書き換え、まだなら利益が出る時だけ送る"""
+    try:
+        if decide(it):
+            send_items([it])
+    except Exception as e:
+        print(f"  照合（裏の係）でエラー: {e}")
 REQUEST_WAIT = 1.0                    # サイトへの優しさ（アクセスの間に待つ秒数）
 
 # ↓ ループ監視（短い間隔で見張り続ける）用の設定。数字は環境変数で変えられます。
@@ -184,7 +205,8 @@ def kindal_items_newest(brand):
     （実測 2026-11-25: 1ページ目に直近1〜1.5か月分）。1回0.3〜0.4秒で取れるので
     10秒ごとに見られる。取りこぼし防止に、全ページの確認も10分ごとに別途行う。
     """
-    url = f"{SHOP}/collections/{brand['collection']}/products.json?limit={PER_PAGE}&page=1"
+    url = (f"{SHOP}/collections/{brand['collection']}/products.json"
+           f"?limit={KINDAL_NEWEST_LIMIT}&page=1")
     data = http_get_json(url)
     return [build_item(p, brand["name"], SHOP, "KINDAL") for p in data.get("products", [])]
 
@@ -265,16 +287,25 @@ def git_save_state():
         print(f"  状態の保存(push)に失敗: {e}")
 
 
-def discord_post(payload):
-    """Discord に1メッセージ送る（共通部分）"""
+def discord_post(payload, want_id=False, edit_id=None):
+    """Discord に1メッセージ送る（共通部分）。
+    want_id=True で、送ったメッセージの番号を返す（あとで書き換えるため）。
+    edit_id を渡すと、新しく送らずにそのメッセージを書き換える。
+    """
     webhook = os.environ.get("DISCORD_WEBHOOK_URL", "").strip()
     if not webhook:
         print("DISCORD_WEBHOOK_URL が未設定。通知をスキップします。")
-        return
+        return None
     data = json.dumps(payload).encode("utf-8")
+    url, method = webhook, "POST"
+    if edit_id:
+        url, method = f"{webhook.split('?')[0]}/messages/{edit_id}", "PATCH"
+    elif want_id:
+        url = webhook + ("&" if "?" in webhook else "?") + "wait=true"
     req = urllib.request.Request(
-        webhook,
+        url,
         data=data,
+        method=method,
         headers={
             "Content-Type": "application/json",
             # ↓ これが無いと Discord に 403 で拒否される（名乗りが必要）
@@ -282,7 +313,13 @@ def discord_post(payload):
         },
     )
     try:
-        urllib.request.urlopen(req, timeout=30)
+        with urllib.request.urlopen(req, timeout=30) as res:
+            if want_id and not edit_id:
+                try:
+                    return json.loads(res.read().decode("utf-8")).get("id") or None
+                except Exception:
+                    return None
+            return True
     except urllib.error.HTTPError as e:
         # 失敗の理由（文字数オーバー等）をログに残す
         body = ""
@@ -458,30 +495,50 @@ def send_items(items):
     # カードを詰め込みすぎると丸ごと失敗する。4件ずつなら安全。
     for i in range(0, len(items), 4):
         chunk = items[i:i + 4]
-        embeds = []
-        for it in chunk:
-            # お店の名前があれば一緒に表示する（KINDAL / トレファク）
-            shop = it.get("shop", "")
-            shop_line = f"🏪 {shop}\n" if shop else ""
-            embed = {
-                "title": it["title"][:250],
-                "url": it["url"],
-                "description": (
-                    f"{shop_line}🏷️ {it['brand']}\n💴 仕入 {it['price']}\n"
-                    + profit_lines(it, souba)
-                ),
-            }
-            if it.get("image"):
-                # 右上の小さい写真 ＝ お店の商品
-                embed["thumbnail"] = {"url": it["image"]}
-            m = it.get("img_match")
-            if m and m.get("ref_image"):
-                # 下の大きい写真 ＝ メルカリで売れた実例（見比べ用）
-                embed["image"] = {"url": m["ref_image"]}
-            embeds.append(embed)
+        embeds = [build_embed(it, souba) for it in chunk]
         discord_post({"content": f"🆕 新着 {len(chunk)} 件", "embeds": embeds})
         print(f"  Discordに {len(chunk)} 件通知しました")
         time.sleep(1)  # 連続で送りすぎない
+
+
+def build_embed(it, souba, pending=False):
+    """通知カード1枚分を作る。pending=True は『速報（相場はこれから調べる）』"""
+    # お店の名前があれば一緒に表示する（KINDAL / トレファク）
+    shop = it.get("shop", "")
+    shop_line = f"🏪 {shop}\n" if shop else ""
+    tail = ("⏳ 相場を照合中…（数十秒でこのカードに追記されます）" if pending
+            else profit_lines(it, souba))
+    if it.get("_note"):
+        tail = it["_note"] + "\n" + tail
+    embed = {
+        "title": it["title"][:250],
+        "url": it["url"],
+        "description": f"{shop_line}🏷️ {it['brand']}\n💴 仕入 {it['price']}\n" + tail,
+    }
+    if it.get("image"):
+        # 右上の小さい写真 ＝ お店の商品
+        embed["thumbnail"] = {"url": it["image"]}
+    m = it.get("img_match")
+    if m and m.get("ref_image"):
+        # 下の大きい写真 ＝ メルカリで売れた実例（見比べ用）
+        embed["image"] = {"url": m["ref_image"]}
+    return embed
+
+
+def send_now(it, souba):
+    """見つけた瞬間に1件だけ速報で送る（相場の照合を待たない）。メッセージ番号を返す"""
+    mid = discord_post({"content": "🆕 新着（速報）", "embeds": [build_embed(it, souba, pending=True)]},
+                       want_id=True)
+    if mid:
+        print(f"  速報: {it.get('shop')} {it.get('title', '')[:40]}")
+    return mid
+
+
+def update_sent(mid, it, souba):
+    """速報で送ったカードを、相場の照合結果つきに書き換える"""
+    if mid is True:  # 番号が取れなかった時は書き換えられない
+        return
+    discord_post({"content": "🆕 新着", "embeds": [build_embed(it, souba)]}, edit_id=mid)
 
 
 def load_excludes():
@@ -564,7 +621,7 @@ def matches_skip(item, skip_keywords):
     return any(k.lower() in text for k in skip_keywords)
 
 
-def check_source(brands, seen, first_run, get_items, do_slow=True, wait=None):
+def check_source(brands, seen, first_run, get_items, do_slow=True, wait=None, fast_notify=False):
     """1つのサイトの全ブランドを1回チェックして、新着リストを返す。
 
     wait … ブランドを1つ見るごとに待つ秒数（同じサイトへの連続アクセスの間隔）。
@@ -573,6 +630,11 @@ def check_source(brands, seen, first_run, get_items, do_slow=True, wait=None):
 
     get_items(brand) … そのブランドの商品一覧（id付きの辞書リスト）を返す関数。
     KINDAL でもトレファクでも、この共通処理で扱える。
+
+    fast_notify … True（KINDAL）のときは、文字の条件を通った新着を『相場の照合より先に』
+              すぐ速報で送り、照合が終わったらそのカードに利益の見込みを書き足す
+              （画像照合に数秒〜数十秒かかり、その間に売り切れるのを防ぐため。2026-11-28 依頼）。
+              単調な服（派手な言葉が無い物）は、利益が出るか見てから送る（今まで通り）。
 
     do_slow … False のときは「利益が出る時だけ通知」する②ブランド
               (profit_only) をスキップする。①の優先ブランド(サンローラン等)を
@@ -618,6 +680,80 @@ def check_source(brands, seen, first_run, get_items, do_slow=True, wait=None):
             only_kw = b.get("only_keywords")  # 例: Undercoverは「デニム」だけ
             profit_only = b.get("profit_only")  # 例: ②ブランドは利益が出る時だけ
             keep = []
+            # 速報：文字の条件だけで通知してよい物は、照合の前に全部すぐ送る
+            fast_sent = {}  # 商品ID → Discordのメッセージ番号
+            if fast_notify and not profit_only:
+                for it in fresh:
+                    if (is_excluded(it, excludes) or not matches_only(it, only_kw)
+                            or matches_skip(it, b.get("skip_keywords"))):
+                        continue
+                    if priority is not None:
+                        why = priority.skip_reason(it.get("title", ""), it.get("category", ""))
+                        if why == "シンプル服" and priority.notify_simple_new():
+                            why = None
+                        if why:
+                            continue
+                        if priority.only_distinctive() and not priority.is_flashy(
+                                f"{it.get('title', '')} {it.get('category', '')}"):
+                            continue  # 単調な服は、利益が出るか見てから（下の通常の流れ）
+                    mid = send_now(it, souba)
+                    if mid:
+                        fast_sent[str(it.get("id"))] = mid
+                        _fast_sent_total[0] += 1
+            def decide(it, b=b, profit_only=profit_only, fast_sent=fast_sent,
+                       skipped_by_priority=skipped_by_priority):
+                """写真の照合をして、通知するか(True)を決める。速報済みの物はカードを書き換える"""
+                # 商品写真をメルカリ相場DBと見比べる（画像の指紋で照合）。
+                # ②ブランドは利益ライン以上の時だけ通知するので、利益ライン未満は
+                # 重い答え合わせを省いて高速化する（①ブランドは表示用に常に照合）。
+                match = None
+                if image_match_ready() and it.get("image"):
+                    mp = souba["notify_line"] if profit_only else None
+                    with MATCH_LOCK:
+                        match = souba_match.match_item(it, souba, min_profit=mp)
+                fid = fast_sent.get(str(it.get("id")))
+                if fid:
+                    # 速報で送り済み → 照合の結果をそのカードに書き足す
+                    if match:
+                        it["img_match"] = match
+                    if it.get("_priority_skip"):
+                        it["_note"] = f"⚠️ 写真では『{it['_priority_skip']}』の可能性"
+                    update_sent(fid, it, souba)
+                    return False
+                # 写真を見て『服以外』と判定された商品は、相場照合の結果に関わらず
+                # 通知しない（①優先ブランドは相場が見つからなくても通知するため、
+                # ここで止めないとバッグ等がすり抜ける）
+                if it.get("_priority_skip"):
+                    why = it["_priority_skip"]
+                    skipped_by_priority[why] = skipped_by_priority.get(why, 0) + 1
+                    return False
+                if match:
+                    it["img_match"] = match  # 通知カードに表示するため覚えておく
+                if profit_only:
+                    # ②ブランドは『ほぼ同デザインの売却実例があり、
+                    # 予想利益が通知ライン(2000円)以上』の時だけ通知する
+                    if (not match
+                            or match["rank"] != "同デザイン"
+                            or match["profit"] is None
+                            or match["profit"] < souba["notify_line"]):
+                        return False
+                elif priority is not None and priority.only_distinctive():
+                    # ①優先ブランドは今まで新着を全部通知していたが、単調な服が
+                    # 多く混ざるため『派手な言葉があるか、利益が出る物』だけに絞る。
+                    # 商品名が雑でも利益が出るなら通知されるので、狙い目は逃さない。
+                    # （priority.json の『優先ブランド_派手か利益が出る物だけ通知する』
+                    #   を false にすると、今まで通り全部通知する）
+                    flashy = priority.is_flashy(
+                        f"{it.get('title', '')} {it.get('category', '')}")
+                    profitable = (match and match.get("profit") is not None
+                                  and match["profit"] >= souba["notify_line"])
+                    if not flashy and not profitable:
+                        skipped_by_priority["単調(優先ブランド)"] = (
+                            skipped_by_priority.get("単調(優先ブランド)", 0) + 1)
+                        return False
+                return True
+
+            queued = 0
             for it in fresh:
                 # まず共通の除外（財布/サングラス等）と only_keywords を確認
                 if is_excluded(it, excludes):
@@ -639,53 +775,23 @@ def check_source(brands, seen, first_run, get_items, do_slow=True, wait=None):
                     if why:
                         skipped_by_priority[why] = skipped_by_priority.get(why, 0) + 1
                         continue
-                # 商品写真をメルカリ相場DBと見比べる（画像の指紋で照合）。
-                # ②ブランドは利益ライン以上の時だけ通知するので、利益ライン未満は
-                # 重い答え合わせを省いて高速化する（①ブランドは表示用に常に照合）。
-                match = None
-                if image_match_ready() and it.get("image"):
-                    mp = souba["notify_line"] if profit_only else None
-                    match = souba_match.match_item(it, souba, min_profit=mp)
-                # 写真を見て『服以外』と判定された商品は、相場照合の結果に関わらず
-                # 通知しない（①優先ブランドは相場が見つからなくても通知するため、
-                # ここで止めないとバッグ等がすり抜ける）
-                if it.get("_priority_skip"):
-                    why = it["_priority_skip"]
-                    skipped_by_priority[why] = skipped_by_priority.get(why, 0) + 1
+                if fast_notify:
+                    # 照合（数秒〜数十秒）は裏の係に任せ、KINDALの見張りはすぐ次のチェックへ戻る
+                    _match_pool.submit(_bg_decide, decide, it)
+                    queued += 1
                     continue
-                if match:
-                    it["img_match"] = match  # 通知カードに表示するため覚えておく
-                if profit_only:
-                    # ②ブランドは『ほぼ同デザインの売却実例があり、
-                    # 予想利益が通知ライン(2000円)以上』の時だけ通知する
-                    if (not match
-                            or match["rank"] != "同デザイン"
-                            or match["profit"] is None
-                            or match["profit"] < souba["notify_line"]):
-                        continue
-                elif priority is not None and priority.only_distinctive():
-                    # ①優先ブランドは今まで新着を全部通知していたが、単調な服が
-                    # 多く混ざるため『派手な言葉があるか、利益が出る物』だけに絞る。
-                    # 商品名が雑でも利益が出るなら通知されるので、狙い目は逃さない。
-                    # （priority.json の『優先ブランド_派手か利益が出る物だけ通知する』
-                    #   を false にすると、今まで通り全部通知する）
-                    flashy = priority.is_flashy(
-                        f"{it.get('title', '')} {it.get('category', '')}")
-                    profitable = (match and match.get("profit") is not None
-                                  and match["profit"] >= souba["notify_line"])
-                    if not flashy and not profitable:
-                        skipped_by_priority["単調(優先ブランド)"] = (
-                            skipped_by_priority.get("単調(優先ブランド)", 0) + 1)
-                        continue
-                keep.append(it)
-            skipped = len(fresh) - len(keep)
+                if decide(it):
+                    keep.append(it)
+            skipped = len(fresh) - len(keep) - queued
             new_items.extend(keep)
             pr = ("・服以外/シンプル " + "、".join(f"{k}{v}" for k, v in skipped_by_priority.items())
                   if skipped_by_priority else "")
-            print(f"  新着 {len(fresh)} 件: {key}（通知 {len(keep)} / 対象外 {skipped}{pr}）")
+            fs = f"・速報 {len(fast_sent)}・照合へ {queued}" if fast_notify else ""
+            print(f"  新着 {len(fresh)} 件: {key}（通知 {len(keep)}{fs} / 対象外 {skipped}{pr}）")
 
         # 見た商品リストを更新（今ある商品IDを全部覚える）
-        seen[key] = sorted(seen_ids | set(current_ids))
+        with STATE_LOCK:
+            seen[key] = sorted(seen_ids | set(current_ids))
         time.sleep(REQUEST_WAIT if wait is None else wait)
     return new_items
 
@@ -1072,7 +1178,8 @@ def main():
 
     rinkan_wins = parse_windows(RINKAN_WINDOW)
     end_time = adjust_end(time.time() + LOOP_MINUTES * 60, parse_windows(PROTECT_WINDOWS))
-    print(f"ループ監視開始: KINDALは{KINDAL_SECONDS}秒ごと(1ページ目)・全ページは{SLOW_SECONDS}秒ごと / "
+    print(f"ループ監視開始: KINDALは専用の見張り役で{KINDAL_SECONDS}秒ごと(各売り場の先頭{KINDAL_NEWEST_LIMIT}件・速報)"
+          f"・全ページは{SLOW_SECONDS}秒で一巡 / "
           f"他の店は{POLL_SECONDS}秒ごと（RINKANは{RINKAN_WINDOW}の間{RINKAN_WINDOW_SECONDS}秒ごと） / "
           f"②ブランドは{SLOW_SECONDS}秒ごと / 終了 {time.strftime('%H:%M', time.gmtime(end_time + 9 * 3600))}(日本時間)")
 
@@ -1088,12 +1195,14 @@ def main():
     save_all()
     git_save_state()  # 記録をすぐサーバーに保存（重複通知を防ぐ）
 
-    def handle(items):
+    def handle(items, force_save=False):
         if items:
             print(f"新着 {len(items)} 件 → 通知")
             send_items(items)
-            save_all()
-            git_save_state()  # 通知したら即サーバー保存（重複通知を防ぐ）
+        if items or force_save:
+            with STATE_LOCK:
+                save_all()
+                git_save_state()  # 通知したら即サーバー保存（重複通知を防ぐ）
 
     # 仕事の一覧。他の店は『1ブランドずつ』の小さな仕事に分ける。1つの仕事が数秒で終わるので、
     # その合間にKINDALの10秒チェックを差し込める（大きな巡回でKINDALが待たされない）。
@@ -1130,33 +1239,39 @@ def main():
     SPEED_SAVE_SECONDS = int(os.environ.get("SPEED_SAVE_SECONDS", "1800"))
     speed = {"started": time.time(), "last_start": {}, "gaps": {}, "durs": {}, "target": {},
              "slowest": [], "saved": time.time()}
+    speed_lock = threading.Lock()  # KINDALの見張り役と同時に書くため
 
     def timed(site, key, target, fn):
         t0 = time.time()
-        prev = speed["last_start"].get(key)
-        if prev is not None:
-            speed["gaps"].setdefault(site, []).append(t0 - prev)
-        speed["last_start"][key] = t0
-        speed["target"][site] = target
+        with speed_lock:
+            prev = speed["last_start"].get(key)
+            if prev is not None:
+                speed["gaps"].setdefault(site, []).append(t0 - prev)
+            speed["last_start"][key] = t0
+            speed["target"][site] = target
         try:
             return fn()
         finally:
             d = time.time() - t0
-            speed["durs"].setdefault(site, []).append(d)
-            if d >= 15:
-                speed["slowest"].append((round(d, 1), site, time.strftime(
-                    "%m/%d %H:%M", time.gmtime(t0 + 9 * 3600))))
-                speed["slowest"] = sorted(speed["slowest"], reverse=True)[:10]
+            with speed_lock:
+                speed["durs"].setdefault(site, []).append(d)
+                if d >= 15:
+                    speed["slowest"].append((round(d, 1), site, time.strftime(
+                        "%m/%d %H:%M", time.gmtime(t0 + 9 * 3600))))
+                    speed["slowest"] = sorted(speed["slowest"], reverse=True)[:10]
 
     def save_speed(final=False):
         def q(xs, p):
             xs = sorted(xs)
             return round(xs[min(len(xs) - 1, int(len(xs) * p))], 1) if xs else None
+        with speed_lock:
+            snap = {k: (dict((kk, list(vv)) for kk, vv in speed[k].items())
+                        if k in ("gaps", "durs") else speed[k]) for k in speed}
         sites = {}
-        for site in sorted(set(speed["gaps"]) | set(speed["durs"])):
-            g, d = speed["gaps"].get(site, []), speed["durs"].get(site, [])
+        for site in sorted(set(snap["gaps"]) | set(snap["durs"])):
+            g, d = snap["gaps"].get(site, []), snap["durs"].get(site, [])
             sites[site] = {
-                "設定の間隔(秒)": speed["target"].get(site),
+                "設定の間隔(秒)": snap["target"].get(site),
                 "実際の間隔_ふつう(秒)": q(g, 0.5),
                 "実際の間隔_遅い時(上位10%)(秒)": q(g, 0.9),
                 "実際の間隔_最長(秒)": round(max(g), 1) if g else None,
@@ -1173,7 +1288,7 @@ def main():
                     "『15秒以上かかったチェック』は、新着の画像照合などで監視が止まっていた時間。",
             "店ごと": sites,
             "15秒以上かかったチェック": [
-                {"秒": s, "店": site, "時刻": t} for s, site, t in speed["slowest"]],
+                {"秒": s, "店": site, "時刻": t} for s, site, t in snap["slowest"]],
         }
         try:
             with open(SPEED_FILE, "w", encoding="utf-8") as f:
@@ -1182,8 +1297,70 @@ def main():
             print(f"  速さの記録の保存に失敗: {e}")
         speed["saved"] = time.time()
 
+    # ---- KINDAL専用の見張り役（2026-11-28 依頼: KINDALはもっと早く・必ずすぐ通知）----
+    # 他の店の読み込みや画像照合を待たないよう、KINDALだけ別の見張り役で同時に動かす。
+    #  ・新着チェック: 全売り場の先頭ページを『同時に』読む（1回 約1秒）→ KINDAL_SECONDS ごと
+    #  ・全ページの確認（取りこぼしの保険）: 1売り場ずつ順番に。SLOW_SECONDS で全売り場が一巡
+    #  ・お店から『読みすぎ』(429/403)と言われたら、間隔を自動で広げて様子を見る
+    kindal_pool = ThreadPoolExecutor(max_workers=max(1, len(kindal_brands)))
+
+    def kindal_fast_check():
+        futs = [(b["collection"], kindal_pool.submit(kindal_items_newest, b)) for b in kindal_brands]
+        got, limited = {}, False
+        for col, f in futs:
+            try:
+                got[col] = f.result()
+            except Exception as e:
+                got[col] = e
+                if isinstance(e, urllib.error.HTTPError) and e.code in (403, 429):
+                    limited = True
+
+        def getter(b):
+            r = got[b["collection"]]
+            if isinstance(r, Exception):
+                raise r
+            return r
+        before = _fast_sent_total[0]
+        items = check_source(kindal_brands, kindal_seen, False, getter, True, wait=0,
+                             fast_notify=True)
+        return items, limited, _fast_sent_total[0] != before
+
+    def kindal_worker():
+        fails = 0
+        n = max(1, len(kindal_brands))
+        next_fast, next_full, full_i = time.time(), time.time() + SLOW_SECONDS / n, 0
+        while time.time() < end_time:
+            now = time.time()
+            try:
+                if now >= next_fast:
+                    items, limited, sent = timed("KINDAL(新着)", "kindal", KINDAL_SECONDS,
+                                                 kindal_fast_check)
+                    fails = fails + 1 if limited else 0
+                    iv = KINDAL_SECONDS if not fails else min(300, KINDAL_SECONDS * (2 ** fails))
+                    if fails:
+                        print(f"  KINDALから読みすぎの合図 → {iv}秒あけます（{fails}回連続）")
+                    next_fast = now + iv
+                    handle(items, force_save=sent)
+                    continue
+                if now >= next_full and kindal_brands:
+                    b = kindal_brands[full_i % n]
+                    full_i += 1
+                    next_full = now + SLOW_SECONDS / n
+                    before = _fast_sent_total[0]
+                    items = timed("KINDAL(全ページ・1売り場ずつ)", "kindal_full", SLOW_SECONDS / n,
+                                  lambda: check_source([b], kindal_seen, False, kindal_items, True,
+                                                       wait=0, fast_notify=True))
+                    handle(items, force_save=_fast_sent_total[0] != before)
+                    continue
+            except Exception as e:
+                print(f"  KINDALチェック中のエラー（続行）: {e}")
+            time.sleep(max(0.05, min(0.5, min(next_fast, next_full) - time.time())))
+
+    kindal_thread = threading.Thread(target=kindal_worker, name="kindal", daemon=True)
+    kindal_thread.start()
+
     now0 = time.time()
-    next_run = {"kindal": now0 + KINDAL_SECONDS, "kindal_full": now0 + SLOW_SECONDS}
+    next_run = {}
     for j, t in enumerate(other_tasks):
         # 開始直後に全部の仕事が一度に来ないよう、少しずつずらす
         next_run[t[0]] = now0 + POLL_SECONDS * (j + 1) / max(1, len(other_tasks))
@@ -1193,25 +1370,12 @@ def main():
         now = time.time()
         # 30分ごとに実際の速さを記録してサーバーに保存（忙しくて休みが無い時も必ず通る場所）
         if now - speed["saved"] >= SPEED_SAVE_SECONDS:
-            save_speed()
-            git_save_state()
+            with STATE_LOCK:
+                save_speed()
+                git_save_state()
         try:
-            # ① KINDAL 1ページ目（最優先）
-            if now >= next_run["kindal"]:
-                next_run["kindal"] = now + KINDAL_SECONDS
-                # 同じKINDALへ3回続けて読みに行くので、間は0.3秒だけ空ける
-                handle(timed("KINDAL(1ページ目)", "kindal", KINDAL_SECONDS,
-                             lambda: check_source(kindal_brands, kindal_seen, False,
-                                                  kindal_items_newest, True, wait=0.3)))
-                continue
-            # ② KINDAL 全ページ（1ページ目より後ろに新着が紛れた時の保険）
-            if now >= next_run["kindal_full"]:
-                next_run["kindal_full"] = now + SLOW_SECONDS
-                handle(timed("KINDAL(全ページ)", "kindal_full", SLOW_SECONDS,
-                             lambda: check_source(kindal_brands, kindal_seen, False,
-                                                  kindal_items, True)))
-                continue
-            # ③ 他の店：期限が来た仕事のうち、一番待っているもの1つだけ
+            # KINDALは専用の見張り役（kindal_worker）が同時に見ている
+            # 他の店：期限が来た仕事のうち、一番待っているもの1つだけ
             due = [t for t in other_tasks if now >= next_run[t[0]]]
             if due:
                 key, site, b, seen_, getter = min(due, key=lambda t: next_run[t[0]])
@@ -1221,20 +1385,25 @@ def main():
                 # 1ブランドだけの仕事なので、ブランド後の待ちは不要（仕事の間隔がサイトへの間隔）
                 label = site + ("(RINKAN時間帯)" if site == "RINKAN" and iv == RINKAN_WINDOW_SECONDS
                                 else "(②ゆっくり)" if iv == SLOW_SECONDS else "")
-                handle(timed(label, key + label, iv,
+                handle(timed(label, key, iv,
                              lambda: check_source([b], seen_, False, getter, True, wait=0)))
                 continue
         except Exception as e:
             # 1つの仕事の失敗で監視全体を止めない
             print(f"  チェック中のエラー（続行）: {e}")
         # 次の仕事までの待ち時間（最大1秒ずつ待って様子を見る）
-        wait = min(next_run.values()) - time.time()
+        wait = (min(next_run.values()) if next_run else time.time() + 1) - time.time()
         time.sleep(max(0.2, min(1.0, wait)))
 
+    # KINDALの見張り役が最後の1回を終えるのを待つ
+    kindal_thread.join(timeout=180)
+    kindal_pool.shutdown(wait=False)
+    _match_pool.shutdown(wait=True)  # 照合待ちの新着を最後まで片づける
     # 最後に記録を保存して終了（次の見張りが続きから始められる）
-    save_all()
-    save_speed(final=True)
-    git_save_state()
+    with STATE_LOCK:
+        save_all()
+        save_speed(final=True)
+        git_save_state()
     print("ループ監視 終了")
 
 

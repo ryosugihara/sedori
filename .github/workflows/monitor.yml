@@ -78,7 +78,7 @@ jobs:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           LOOP_MODE: "1" # ループ監視を有効にする
           POLL_SECONDS: "30" # KINDAL以外の店を何秒ごとにチェックするか
-          KINDAL_POLL_SECONDS: "10" # KINDAL(1ページ目)を何秒ごとにチェックするか
+          KINDAL_POLL_SECONDS: "5" # KINDAL(各売り場の先頭)を何秒ごとにチェックするか（専用の見張り役・速報。2026-11-28 10→5秒）
           RINKAN_WINDOW: "10:00-12:00" # RINKANの出品が多い時間帯(日本時間)。この間は監視の交代もしない
           RINKAN_WINDOW_SECONDS: "10" # 上の時間帯にRINKANを何秒ごとにチェックするか
           LOOP_MINUTES: ${{ github.event.inputs.loop_minutes || '300' }} # 1回の見張り時間（分）
